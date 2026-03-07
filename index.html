@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מערכת מלאי</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #0f1117;
+  --s1: #161920;
+  --s2: #1c2030;
+  --s3: #222840;
+  --border: #2a3050;
+  --border2: #3a4068;
+  --text: #dce4f0;
+  --muted: #6a7590;
+  --accent: #3d7eff;
+  --aleph: #22c55e;
+  --bet: #f59e0b;
+  --gimel: #a78bfa;
+  --mesayaat: #f43f5e;
+  --plasm: #06b6d4;
+  --red: #ef4444;
+  --green: #22c55e;
+  --orange: #f97316;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl}
+
+/* ── SIDEBAR ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:200px;background:var(--s1);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh}
+.logo{padding:20px 16px 16px;border-bottom:1px solid var(--border)}
+.logo h1{font-size:1rem;font-weight:800;color:var(--text)}
+.logo p{font-size:0.72rem;color:var(--muted);margin-top:2px}
+.nav{padding:12px 8px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;cursor:pointer;font-size:0.85rem;color:var(--muted);transition:all 0.15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:right;font-family:'Heebo',sans-serif}
+.nav-item:hover{background:var(--s2);color:var(--text)}
+.nav-item.active{background:var(--s3);color:var(--accent);font-weight:600}
+.nav-item .icon{font-size:1rem;flex-shrink:0}
+.sync-status{padding:12px 16px;border-top:1px solid var(--border);font-size:0.72rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.sync-dot.error{background:var(--red)}
+.sync-dot.loading{background:var(--orange);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{padding:16px 24px;background:var(--s1);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;position:sticky;top:0;z-index:50}
+.topbar h2{font-size:1.1rem;font-weight:700}
+.topbar-actions{display:flex;gap:8px;align-items:center}
+.content{flex:1;padding:20px 24px}
+
+/* ── BUTTONS ── */
+.btn{background:var(--s2);border:1px solid var(--border2);color:var(--text);font-family:'Heebo',sans-serif;font-size:0.82rem;font-weight:500;padding:7px 14px;border-radius:8px;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:var(--s3);border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#2d6ee0}
+.btn.danger{background:rgba(239,68,68,0.1);border-color:var(--red);color:var(--red)}
+.btn.danger:hover{background:var(--red);color:#fff}
+.btn.success{background:rgba(34,197,94,0.1);border-color:var(--green);color:var(--green)}
+.btn.success:hover{background:var(--green);color:#fff}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* ── UNIT PILLS ── */
+.unit-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.upill{padding:5px 14px;border-radius:16px;font-size:0.8rem;font-weight:600;cursor:pointer;border:1.5px solid;transition:all 0.15s}
+.upill.all{border-color:var(--border2);color:var(--muted)}
+.upill.all.active,.upill.all:hover{background:var(--s3);color:var(--text);border-color:var(--text)}
+.upill.u-aleph{border-color:var(--aleph);color:var(--aleph)}
+.upill.u-bet{border-color:var(--bet);color:var(--bet)}
+.upill.u-gimel{border-color:var(--gimel);color:var(--gimel)}
+.upill.u-mesayaat{border-color:var(--mesayaat);color:var(--mesayaat)}
+.upill.u-plasm{border-color:var(--plasm);color:var(--plasm)}
+.upill.u-agam{border-color:#8b5cf6;color:#8b5cf6}
+.upill.u-agam.active{background:#8b5cf6}
+.upill.active{color:#fff!important}
+.upill.u-aleph.active{background:var(--aleph)}
+.upill.u-bet.active{background:var(--bet)}
+.upill.u-gimel.active{background:var(--gimel)}
+.upill.u-mesayaat.active{background:var(--mesayaat)}
+.upill.u-plasm.active{background:var(--plasm)}
+
+/* ── STATS CHIPS ── */
+.stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.stat-chip{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 16px;min-width:120px}
+.stat-chip .s-label{font-size:0.72rem;color:var(--muted);margin-bottom:4px}
+.stat-chip .s-val{font-size:1.4rem;font-weight:800}
+.stat-chip .s-sub{font-size:0.72rem;color:var(--muted);margin-top:2px}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;min-width:700px}
+thead th{background:var(--s2);padding:10px 12px;font-size:0.75rem;font-weight:600;color:var(--muted);text-align:right;border-bottom:2px solid var(--border2);white-space:nowrap}
+th.center,td.center{text-align:center}
+tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--s1)}
+td{padding:9px 12px;font-size:0.85rem;vertical-align:middle}
+.cat-row td{background:var(--s2);color:var(--accent);font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;padding:6px 12px;border-top:2px solid var(--border2)}
+td.item-name{font-weight:500}
+td.makat-cell{font-size:0.75rem;color:var(--muted);font-family:monospace;white-space:nowrap}
+td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
+
+/* ── INPUTS ── */
+.qty-input{width:64px;background:var(--s3);border:1px solid var(--border2);border-radius:6px;padding:4px 6px;color:var(--text);font-family:'Heebo',sans-serif;font-size:0.85rem;text-align:center;outline:none;transition:border-color 0.15s;-moz-appearance:textfield}
+.qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none}
+.qty-input:focus{border-color:var(--accent)}
+.qty-input.over{border-color:var(--red);color:var(--red)}
+
+/* ── GAP BADGE ── */
+.gap{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:700}
+.gap.ok{background:rgba(34,197,94,0.12);color:var(--green)}
+.gap.over{background:rgba(239,68,68,0.12);color:var(--red)}
+.gap.zero{color:var(--muted);font-size:0.8rem}
+
+/* ── MOVEMENT CARDS ── */
+.mov-list{display:flex;flex-direction:column;gap:8px}
+.mov-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px}
+.mov-icon{font-size:1.4rem;flex-shrink:0}
+.mov-info{flex:1}
+.mov-info .mov-title{font-weight:600;font-size:0.9rem}
+.mov-info .mov-meta{font-size:0.75rem;color:var(--muted);margin-top:2px}
+.mov-qty{font-size:1.1rem;font-weight:800}
+.mov-qty.out{color:var(--red)}
+.mov-qty.in{color:var(--green)}
+
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:28px;width:min(480px,92vw);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:1.05rem;font-weight:700;margin-bottom:18px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:0.78rem;color:var(--muted);margin-bottom:5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Heebo',sans-serif;font-size:0.88rem;outline:none;transition:border-color 0.15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+.form-group select option{background:var(--s2)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── REPORT ── */
+.report-section{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px}
+.report-section h3{font-size:0.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px}
+.report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.report-item{background:var(--s2);border-radius:8px;padding:10px 12px}
+.report-item .ri-name{font-size:0.8rem;font-weight:600;margin-bottom:4px}
+.report-item .ri-units{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ri-unit-tag{font-size:0.7rem;padding:2px 6px;border-radius:8px;font-weight:600}
+
+/* ── SEARCH ── */
+.search-wrap{position:relative}
+.search-wrap input{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 12px 8px 32px;color:var(--text);font-family:'Heebo',sans-serif;font-size:0.85rem;width:220px;outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-wrap input::placeholder{color:var(--muted)}
+.search-wrap::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:0.78rem}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--s2);border:1px solid var(--border2);border-radius:10px;padding:10px 20px;font-size:0.88rem;z-index:1000;transition:transform 0.3s;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px;color:var(--muted)}
+.empty .e-icon{font-size:2.5rem;margin-bottom:10px}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+@media(max-width:700px){
+  /* Hide desktop sidebar completely */
+  .sidebar{ display:none; }
+
+  /* Layout: simple block, no flex tricks */
+  .layout{ display:block; min-height:100vh; }
+  .main{ display:block; min-height:100vh; padding-bottom:70px; }
+
+  /* Topbar */
+  .topbar{ padding:10px 14px; flex-wrap:wrap; gap:8px; position:sticky; top:0; z-index:50; }
+  .topbar h2{ font-size:0.95rem; }
+  .topbar-actions{ gap:6px; flex-wrap:wrap; }
+
+  /* Content */
+  .content{ padding:12px 12px 24px; }
+
+  /* Stats */
+  .stats-row{ gap:8px; }
+  .stat-chip{ padding:10px 12px; min-width:80px; }
+  .stat-chip .s-val{ font-size:1.1rem; }
+
+  /* Table */
+  .tbl-wrap{ border-radius:8px; }
+  table{ min-width:480px; }
+  thead th{ padding:8px; font-size:0.7rem; }
+  td{ padding:7px 8px; font-size:0.8rem; }
+  .qty-input{ width:52px; font-size:0.8rem; }
+
+  /* Unit bar */
+  .unit-bar{ gap:5px; margin-bottom:12px; flex-wrap:wrap; }
+  .upill{ padding:4px 10px; font-size:0.75rem; }
+
+  /* Movement cards */
+  .mov-card{ padding:10px 12px; gap:10px; }
+  .mov-info .mov-title{ font-size:0.85rem; }
+  .mov-qty{ font-size:1rem; }
+
+  /* Modal */
+  .modal{ padding:20px 16px; }
+  .modal h3{ font-size:0.95rem; margin-bottom:14px; }
+  .form-row{ grid-template-columns:1fr; }
+  .form-group input,.form-group select,.form-group textarea{
+    font-size:16px;
+    padding:12px;
+  }
+
+  /* Search */
+  .search-wrap input{ width:140px; font-size:0.82rem; }
+  .btn{ padding:6px 10px; font-size:0.78rem; }
+
+  /* Report */
+  .report-grid{ grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:6px; }
+
+  /* ── BOTTOM NAV (fixed, always visible) ── */
+  .mobile-nav{
+    display:flex !important;
+    position:fixed;
+    bottom:0; left:0; right:0;
+    height:64px;
+    background:var(--s1);
+    border-top:1px solid var(--border);
+    z-index:200;
+  }
+  .mobile-nav button{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    background:none;
+    border:none;
+    border-right:1px solid var(--border);
+    color:var(--muted);
+    font-family:'Heebo',sans-serif;
+    font-size:0.62rem;
+    cursor:pointer;
+    padding:8px 4px 10px;
+    transition:all 0.15s;
+  }
+  .mobile-nav button:last-child{ border-right:none; }
+  .mobile-nav button .icon{ font-size:1.3rem; }
+  .mobile-nav button.active{
+    color:var(--accent);
+    background:var(--s3);
+    border-top:2px solid var(--accent);
+  }
+}
+
+/* ── DASHBOARD ── */
+.dash-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+.dash-grid.wide{ grid-template-columns:1fr; }
+.dash-card{ background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.dash-card h3{ font-size:0.78rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.pw-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+.pw-unit{ background:var(--s2); border-radius:8px; padding:10px 8px; text-align:center; }
+.pw-unit .pu-label{ font-size:0.7rem; color:var(--muted); margin-bottom:4px; }
+.pw-unit .pu-val{ font-size:1.3rem; font-weight:800; }
+.pw-unit .pu-sub{ font-size:0.65rem; color:var(--muted); margin-top:2px; }
+.field-row{ display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--border); }
+.field-row:last-child{ border-bottom:none; }
+.field-row .fr-name{ font-size:0.83rem; }
+.field-row .fr-meta{ font-size:0.72rem; color:var(--muted); }
+.field-badge{ font-size:0.78rem; font-weight:700; padding:3px 10px; border-radius:10px; }
+.field-badge.out{ background:rgba(249,115,22,0.12); color:var(--orange); }
+.field-badge.ok{ background:rgba(34,197,94,0.12); color:var(--green); }
+.ai-card{ background:linear-gradient(135deg, #1a1f35, #1e2538); border:1px solid #3d5099; border-radius:12px; padding:16px; margin-bottom:14px; }
+.ai-card h3{ font-size:0.78rem; color:#7a9ef0; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:12px; }
+.ai-insight{ display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+.ai-insight:last-child{ border-bottom:none; padding-bottom:0; }
+.ai-icon{ font-size:1.2rem; flex-shrink:0; margin-top:1px; }
+.ai-text{ flex:1; }
+.ai-text .at-title{ font-size:0.85rem; font-weight:600; }
+.ai-text .at-sub{ font-size:0.75rem; color:var(--muted); margin-top:2px; line-height:1.4; }
+.ai-action{ margin-top:6px; }
+.dash-mini-mov{ }
+.dmm-row{ display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid var(--border); }
+.dmm-row:last-child{ border-bottom:none; }
+.dmm-icon{ font-size:1rem; }
+.dmm-info{ flex:1; font-size:0.8rem; }
+.dmm-info span{ color:var(--muted); font-size:0.72rem; }
+.dmm-qty{ font-size:0.85rem; font-weight:700; }
+.dmm-qty.out{ color:var(--orange); }
+.dmm-qty.in{ color:var(--green); }
+@media(max-width:700px){
+  .pw-grid{ grid-template-columns:repeat(3,1fr); }
+  .dash-grid{ grid-template-columns:1fr; gap:12px; }
+}
+
+/* ── DASHBOARD ── */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.dash-card{background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.18s}
+.dash-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.dash-card .dc-icon{font-size:1.6rem;margin-bottom:8px}
+.dash-card .dc-label{font-size:0.72rem;color:var(--muted);margin-bottom:4px}
+.dash-card .dc-val{font-size:1.8rem;font-weight:800;line-height:1}
+.dash-card .dc-sub{font-size:0.72rem;color:var(--muted);margin-top:4px}
+
+.unit-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:20px}
+.unit-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center}
+.unit-card .uc-label{font-size:0.72rem;font-weight:700;margin-bottom:6px}
+.unit-card .uc-num{font-size:1.3rem;font-weight:800}
+.unit-card .uc-sub{font-size:0.68rem;color:var(--muted);margin-top:2px}
+
+.alert-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.alert-item{background:var(--s1);border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border-right:3px solid}
+.alert-item.warn{border-color:var(--orange)}
+.alert-item.danger{border-color:var(--red)}
+.alert-item.info{border-color:var(--accent)}
+.alert-item .ai-icon{font-size:1.1rem;flex-shrink:0;margin-top:1px}
+.alert-item .ai-text{font-size:0.83rem;line-height:1.4}
+.alert-item .ai-text strong{display:block;margin-bottom:2px}
+.alert-item .ai-action{margin-top:6px}
+
+.dash-section-title{font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px}
+
+.recent-list{display:flex;flex-direction:column;gap:6px}
+.recent-item{background:var(--s1);border:1px solid var(--border);border-radius:8px;padding:9px 12px;display:flex;align-items:center;gap:10px;font-size:0.82rem}
+.recent-item .ri-icon{font-size:1rem;flex-shrink:0}
+.recent-item .ri-text{flex:1}
+.recent-item .ri-qty{font-weight:700}
+.recent-item .ri-qty.out{color:var(--red)}
+.recent-item .ri-qty.in{color:var(--green)}
+
+@media(max-width:700px){
+  .unit-grid{grid-template-columns:repeat(3,1fr)}
+  .dash-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .dash-card{padding:12px}
+  .dash-card .dc-val{font-size:1.4rem}
+}
+
+/* ── AUTH ── */
+.auth-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center}
+.auth-box{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:36px 32px;width:min(360px,90vw);text-align:center}
+.auth-box h2{font-size:1.2rem;font-weight:800;margin-bottom:6px}
+.auth-box p{font-size:0.82rem;color:var(--muted);margin-bottom:24px}
+.auth-box input{width:100%;background:var(--s3);border:1px solid var(--border2);border-radius:8px;padding:12px;color:var(--text);font-family:Heebo,sans-serif;font-size:1rem;text-align:center;outline:none;margin-bottom:12px;letter-spacing:0.05em}
+.auth-box input:focus{border-color:var(--accent)}
+.auth-box .auth-err{color:var(--red);font-size:0.8rem;margin-bottom:10px;min-height:18px}
+.auth-readonly{background:rgba(61,126,255,0.08);border:1px solid var(--accent);border-radius:8px;padding:8px 14px;font-size:0.78rem;color:var(--accent);margin-bottom:20px;display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div style="font-size:2.5rem;margin-bottom:12px">🔐</div>
+    <h2>מערכת מלאי</h2>
+    <p>כולם יכולים לצפות — עריכה דורשת סיסמה</p>
+    <div class="auth-readonly" id="readonlyBadge">👁 מצב צפייה בלבד</div>
+    <input type="password" id="authInput" placeholder="סיסמת עריכה..." onkeydown="if(event.key==='Enter')tryAuth()">
+    <div class="auth-err" id="authErr"></div>
+    <button class="btn primary" style="width:100%;justify-content:center;padding:10px" onclick="tryAuth()">כניסה לעריכה</button>
+    <button class="btn" style="width:100%;justify-content:center;margin-top:8px;padding:10px" onclick="enterReadonly()">המשך כצופה</button>
+  </div>
+</div>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <h1>🔫 מלאי</h1>
+    <p>מערכת ניהול</p>
+  </div>
+  <nav class="nav">
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="icon">🏠</span><span>דשבורד</span>
+    </button>
+    <button class="nav-item" onclick="showPage('inventory',this)">
+      <span class="icon">📦</span><span>מלאי</span>
+    </button>
+    <button class="nav-item" onclick="showPage('distribution',this)">
+      <span class="icon">⚖️</span><span>חלוקה</span>
+    </button>
+    <button class="nav-item" onclick="showPage('movements',this)">
+      <span class="icon">🔄</span><span>תנועות</span>
+    </button>
+    <button class="nav-item" onclick="showPage('report',this)">
+      <span class="icon">📋</span><span>דיווח</span>
+    </button>
+  </nav>
+  <div class="sync-status">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncText">מחובר</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+
+  <!-- ── PAGE: DASHBOARD ── -->
+  <div id="page-dashboard" style="display:block">
+    <div class="topbar">
+      <h2>🏠 דשבורד</h2>
+      <div class="topbar-actions">
+        <button class="btn" onclick="loadAll()">🔄 רענן</button>
+      </div>
+    </div>
+    <div class="content">
+      <div id="dashContent"></div>
+    </div>
+  </div>
+
+
+  <!-- ── PAGE: DASHBOARD ── -->
+  <div id="page-dashboard" style="display:block">
+    <div class="topbar">
+      <h2>🏠 דשבורד</h2>
+      <div class="topbar-actions">
+        <div class="sync-status" style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted)">
+          <div class="sync-dot" id="syncDot2"></div>
+          <span id="syncText2">מחובר</span>
+        </div>
+      </div>
+    </div>
+    <div class="content" id="dashContent"></div>
+  </div>
+
+  <!-- ── PAGE: INVENTORY ── -->
+  <div id="page-inventory" style="display:none">
+    <div class="topbar">
+      <h2>📦 מלאי נוכחי</h2>
+      <div class="topbar-actions">
+        <div class="search-wrap"><input type="text" id="invSearch" placeholder="חיפוש..." oninput="renderInventory()"></div>
+        <button class="btn primary" onclick="openModal('addItemModal')">➕ פריט חדש</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="stats-row" id="invStats"></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>קטגוריה</th><th>מק"ט</th><th>פריט</th>
+            <th class="center">כמות כוללת</th>
+            <th class="center">בשטח</th>
+            <th class="center">בנשקייה</th>
+            <th>הערות</th><th></th>
+          </tr></thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: DISTRIBUTION ── -->
+  <div id="page-distribution" style="display:none">
+    <div class="topbar">
+      <h2>⚖️ חלוקה לפלוגות</h2>
+      <div class="topbar-actions">
+        <button class="btn" onclick="autoDistribute()">⚡ חלק שווה</button>
+        <button class="btn primary" onclick="saveDistribution()">💾 שמור חלוקה</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="stats-row" id="distStats"></div>
+      <div class="unit-bar" id="distUnitBar">
+        <div class="upill all active" onclick="setDistFilter('all',this)">הכל</div>
+        <div class="upill u-aleph" onclick="setDistFilter('aleph',this)">א'</div>
+        <div class="upill u-bet" onclick="setDistFilter('bet',this)">ב'</div>
+        <div class="upill u-gimel" onclick="setDistFilter('gimel',this)">ג'</div>
+        <div class="upill u-mesayaat" onclick="setDistFilter('mesayaat',this)">מסייעת</div>
+        <div class="upill u-agam" onclick="setDistFilter('agam',this)">אגם</div>
+        <div class="upill u-plasm" onclick="setDistFilter('plasm',this)">פלסם</div>
+      </div>
+      <div class="tbl-wrap">
+        <table><thead id="distHead"></thead><tbody id="distBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: MOVEMENTS ── -->
+  <div id="page-movements" style="display:none">
+    <div class="topbar">
+      <h2>🔄 תנועות ציוד</h2>
+      <div class="topbar-actions">
+        <button class="btn danger" onclick="openMovModal('out')">📤 יציאה</button>
+        <button class="btn success" onclick="openMovModal('in')">📥 החזרה</button>
+      </div>
+    </div>
+    <div class="content">
+      <div class="unit-bar">
+        <div class="upill all active" onclick="setMovFilter('all',this)">הכל</div>
+        <div class="upill u-aleph" onclick="setMovFilter('aleph',this)">א'</div>
+        <div class="upill u-bet" onclick="setMovFilter('bet',this)">ב'</div>
+        <div class="upill u-gimel" onclick="setMovFilter('gimel',this)">ג'</div>
+        <div class="upill u-mesayaat" onclick="setMovFilter('mesayaat',this)">מסייעת</div>
+        <div class="upill u-agam" onclick="setMovFilter('agam',this)">אגם</div>
+        <div class="upill u-plasm" onclick="setMovFilter('plasm',this)">פלסם</div>
+      </div>
+      <div class="mov-list" id="movList"></div>
+    </div>
+  </div>
+
+  <!-- ── PAGE: REPORT ── -->
+  <div id="page-report" style="display:none">
+    <div class="topbar">
+      <h2>📋 דיווח מלאי</h2>
+      <div class="topbar-actions">
+        <button class="btn primary" onclick="printReport()">🖨️ הדפסה</button>
+      </div>
+    </div>
+    <div class="content" id="reportContent"></div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MODAL: Add Item -->
+<div class="modal-bg" id="addItemModal">
+  <div class="modal">
+    <h3>➕ פריט חדש</h3>
+    <div class="form-group">
+      <label>קטגוריה</label>
+      <select id="newItemCat"><option value="">-- בחר --</option></select>
+    </div>
+    <div class="form-group">
+      <label>מק"ט</label>
+      <input type="text" id="newItemMakat" placeholder="מספר קטלוגי">
+    </div>
+    <div class="form-group">
+      <label>שם הפריט</label>
+      <input type="text" id="newItemName" placeholder="שם הפריט">
+    </div>
+    <div class="form-group">
+      <label>כמות כוללת</label>
+      <input type="number" id="newItemTotal" min="0" placeholder="0">
+    </div>
+    <div class="form-group">
+      <label>הערות</label>
+      <input type="text" id="newItemNote" placeholder="הערות אופציונלי">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('addItemModal')">ביטול</button>
+      <button class="btn primary" onclick="addItem()">הוסף</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Movement -->
+<div class="modal-bg" id="movModal">
+  <div class="modal">
+    <h3 id="movModalTitle">📤 רישום יציאה</h3>
+    <input type="hidden" id="movAction">
+    <div class="form-group">
+      <label>פריט</label>
+      <select id="movItem"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>פלוגה</label>
+        <select id="movUnit">
+          <option value="aleph">א'</option>
+          <option value="bet">ב'</option>
+          <option value="gimel">ג'</option>
+          <option value="mesayaat">מסייעת</option>
+          <option value="agam">אגם</option>
+          <option value="plasm">פלסם</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>כמות</label>
+        <input type="number" id="movQty" min="1" value="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>שם האחראי</label>
+      <input type="text" id="movPerson" placeholder="שם ודרגה">
+    </div>
+    <div class="form-group">
+      <label>הערה</label>
+      <input type="text" id="movNote" placeholder="הערה אופציונלי">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('movModal')">ביטול</button>
+      <button class="btn primary" id="movSubmitBtn" onclick="submitMovement()">רשום</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ═══════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════
+const EDIT_PASSWORD = 'Gdud92202026!';
+let canEdit = false;
+
+function tryAuth() {
+  const val = document.getElementById('authInput').value;
+  if(val === EDIT_PASSWORD) {
+    canEdit = true;
+    sessionStorage.setItem('canEdit','1');
+    document.getElementById('authOverlay').style.display = 'none';
+    setTimeout(loadAll, 100);
+    toast('ברוך הבא — מצב עריכה ✓');
+  } else {
+    document.getElementById('authErr').textContent = 'סיסמה שגויה';
+    document.getElementById('authInput').value = '';
+  }
+}
+
+function enterReadonly() {
+  canEdit = false;
+  document.getElementById('authOverlay').style.display = 'none';
+  setTimeout(loadAll, 100);
+}
+
+// Check session
+if(sessionStorage.getItem('canEdit')==='1') {
+  canEdit = true;
+  document.getElementById('authOverlay').style.display = 'none';
+  setTimeout(loadAll, 100);
+}
+
+function guardEdit(fn) {
+  if(!canEdit) { toast('מצב צפייה בלבד — נדרשת סיסמה', 'err'); return false; }
+  return fn();
+}
+
+// ═══════════════════════════════════════
+// SUPABASE INIT
+// ═══════════════════════════════════════
+const SUPABASE_URL = 'https://mvsbghyniuxpfmseavgx.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im12c2JnaHluaXV4cGZtc2Vhdmd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNjI2NjgsImV4cCI6MjA4NzkzODY2OH0.mIxMyD570KiCLsYc2ymoJRwau4z_pdbpLzTR5NxQnZs';
+let sb;
+try {
+  const { createClient } = window.supabase;
+  sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch(e) {
+  document.body.innerHTML = '<div style="padding:40px;font-family:Heebo,sans-serif;direction:rtl;text-align:center;background:#111;color:#fff;min-height:100vh"><h2 style="color:#ef4444">שגיאה בטעינה</h2><p style="margin-top:12px;color:#888">'+e.message+'</p><p style="margin-top:8px;color:#888">נסה לרענן את הדף</p></div>';
+  throw e;
+}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let items = [], distributions = [], movements = [];
+let distFilter = 'all', movFilter = 'all';
+
+const UNITS = [
+  {key:'aleph',   label:"א'",      color:'#22c55e'},
+  {key:'bet',     label:"ב'",      color:'#f59e0b'},
+  {key:'gimel',   label:"ג'",      color:'#a78bfa'},
+  {key:'mesayaat',label:'מסייעת', color:'#f43f5e'},
+  {key:'agam',    label:'אגם',     color:'#8b5cf6'},
+  {key:'plasm',   label:'פלסם',   color:'#06b6d4'},
+];
+
+const UNIT_LABELS = {aleph:"א'",bet:"ב'",gimel:"ג'",mesayaat:'מסייעת',agam:'אגם',plasm:'פלסם'};
+const CATS = [
+  'נשק אישי','כוונות לנשק אישי','אמר"ל לקלעים','מקלעים קלים','מקלעים כבדים',
+  'טרמי','אמר"ל חד עיני','אמר"ל דו עיני','מט"ל / מט"לון','משקפות + מצפן',
+  'מסייעת ייחודי','צלפים','טלסקופים יום','סמנים','מצפנים','רחפנים','ציוד נוסף','אחר'
+];
+
+// ═══════════════════════════════════════
+// LOAD DATA
+// ═══════════════════════════════════════
+async function loadAll() {
+  setSyncState('loading','טוען...');
+  try {
+    const [iRes, dRes, mRes] = await Promise.all([
+      sb.from('items').select('*').order('cat').order('name'),
+      sb.from('distributions').select('*'),
+      sb.from('movements').select('*').order('created_at', {ascending:false}).limit(200),
+    ]);
+    if (iRes.error) throw iRes.error;
+    if (dRes.error) throw dRes.error;
+    if (mRes.error) throw mRes.error;
+    items = iRes.data || [];
+    distributions = dRes.data || [];
+    movements = mRes.data || [];
+
+    // Seed data if empty
+    if (items.length === 0) await seedData();
+
+    setSyncState('ok','מחובר');
+    renderAll();
+    showPage('dashboard');
+  } catch(e) {
+    setSyncState('error','שגיאה');
+    toast('שגיאה בטעינה: ' + e.message, 'err');
+    // Show error in main content area too
+    document.getElementById('invStats').innerHTML = 
+      '<div style="padding:20px;color:#ef4444;font-size:0.9rem">❌ שגיאת חיבור: ' + e.message + '<br><br><button onclick="loadAll()" style="padding:8px 16px;background:#3d7eff;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Heebo,sans-serif">🔄 נסה שוב</button></div>';
+  }
+}
+
+// ═══════════════════════════════════════
+// SEED INITIAL DATA
+// ═══════════════════════════════════════
+async function seedData() {
+  const seed = [
+    {cat:'נשק אישי',name:'M4',total:332,note:'כולל רס"פים'},
+    {cat:'נשק אישי',name:'M4 קלע',total:64,note:''},
+    {cat:'נשק אישי',name:'M16',total:135,note:'רס"פים'},
+    {cat:'נשק אישי',name:'M320',total:34,note:''},
+    {cat:'כוונות לנשק אישי',name:'פיגיון',total:2,note:''},
+    {cat:'כוונות לנשק אישי',name:'מפרו מור',total:34,note:''},
+    {cat:'כוונות לנשק אישי',name:'כוונת זאבון למטול HK',total:34,note:''},
+    {cat:'כוונות לנשק אישי',name:'כוונת השלכה מתקדמת M5',total:352,note:''},
+    {cat:'כוונות לנשק אישי',name:'ישל"ט למערכת "גיל"',total:2,note:''},
+    {cat:'אמר"ל לקלעים',name:'אמר"ל "ליאור" 4* כולל זוד',total:31,note:''},
+    {cat:'אמר"ל לקלעים',name:'אמר"ל אקילה 4* כולל זוד',total:30,note:''},
+    {cat:'אמר"ל לקלעים',name:'כוונת טרמיס',total:12,note:''},
+    {cat:'אמר"ל לקלעים',name:'מכבית',total:9,note:''},
+    {cat:'מקלעים קלים',name:'מקלע אחיד 7.62',total:43,note:''},
+    {cat:'מקלעים קלים',name:'נגב 7',total:6,note:''},
+    {cat:'מקלעים קלים',name:'נגב פיקטיני',total:5,note:''},
+    {cat:'מקלעים קלים',name:'מקלע קל נגב דגם ב',total:19,note:'בקרוב יביאו עוד'},
+    {cat:'מקלעים קלים',name:'סמן לייזר לנגב',total:30,note:''},
+    {cat:'מקלעים כבדים',name:'מקלע כבד 0.5 בראונינג',total:10,note:'6 לפי דרישה'},
+    {cat:'מקלעים כבדים',name:'מקל"ר מוד 3 40מ"מ MK-19',total:3,note:''},
+    {cat:'מקלעים כבדים',name:'מקל"ר קל משקל',total:1,note:''},
+    {cat:'טרמי',name:'משקפת תרמית "עמית" אכון',total:2,note:''},
+    {cat:'טרמי',name:'משקפת תרמית "עמית"',total:6,note:''},
+    {cat:'טרמי',name:'ערמון',total:2,note:''},
+    {cat:'אמר"ל חד עיני',name:'שח"ע',total:31,note:'לכל נגביסט'},
+    {cat:'אמר"ל חד עיני',name:'שח"מ',total:64,note:''},
+    {cat:'אמר"ל דו עיני',name:'אמר"ל "עכבר" כולל זוד',total:15,note:''},
+    {cat:'אמר"ל דו עיני',name:'אמר"ל לנהג עדי',total:5,note:'1 הושבת'},
+    {cat:'אמר"ל דו עיני',name:'NYX',total:4,note:''},
+    {cat:'אמר"ל דו עיני',name:'מיקרון',total:4,note:''},
+    {cat:'אמר"ל דו עיני',name:'עידו דור ב\'',total:12,note:''},
+    {cat:'מט"ל / מט"לון',name:'מט"ל "כינר"',total:5,note:''},
+    {cat:'מט"ל / מט"לון',name:'מט"ל סרוג 10 ק"מ',total:6,note:'לפי דרישה'},
+    {cat:'מט"ל / מט"לון',name:'מט"ל סרוג 20 ק"מ',total:2,note:'לפי דרישה'},
+    {cat:'מט"ל / מט"לון',name:'מטלון למפקד',total:9,note:''},
+    {cat:'משקפות + מצפן',name:'משקפת שחורה קטנה',total:34,note:''},
+    {cat:'משקפות + מצפן',name:'משקפת ירוקה',total:45,note:''},
+    {cat:'משקפות + מצפן',name:'מצפן',total:62,note:'לקצינים וסמלים'},
+    {cat:'משקפות + מצפן',name:'משקפת 10*50 גלורי',total:32,note:''},
+    {cat:'משקפות + מצפן',name:'משקפת 10*42 דלת',total:22,note:''},
+    {cat:'משקפות + מצפן',name:'משקפת RAZOR 10X50',total:7,note:''},
+    {cat:'משקפות + מצפן',name:'משקפת 7X50 אלפיות גלורי',total:3,note:''},
+    {cat:'מסייעת ייחודי',name:'ישלט וארלי',total:2,note:''},
+    {cat:'מסייעת ייחודי',name:'משקפת 15*80',total:3,note:'יווסת לפי צורך'},
+    {cat:'מסייעת ייחודי',name:'אלירז אורטק',total:1,note:''},
+    {cat:'מסייעת ייחודי',name:'צגון',total:2,note:''},
+    {cat:'צלפים',name:'רוב"צ 338 HTR',total:4,note:''},
+    {cat:'צלפים',name:'רוב"צ 7.62 M24',total:9,note:''},
+    {cat:'צלפים',name:'בארט',total:1,note:''},
+    {cat:'צלפים',name:'כוונת לילה לצלף MUNS',total:2,note:''},
+    {cat:'צלפים',name:'אמר"ל אקילה 6*',total:13,note:''},
+    {cat:'צלפים',name:'כוונת טרמית קליפ-און',total:11,note:''},
+    {cat:'צלפים',name:'מט"ל לצלף',total:7,note:''},
+    {cat:'צלפים',name:'שבשבת לצלף',total:2,note:''},
+    {cat:'צלפים',name:'טלסקופ צלף 2 ליאופולד',total:15,note:''},
+    {cat:'צלפים',name:'טלסקופ זום 20x50',total:2,note:''},
+    {cat:'צלפים',name:'טלסקופ ישר ירין',total:8,note:''},
+    {cat:'צלפים',name:'ליאופולד 10',total:9,note:''},
+    {cat:'טלסקופים יום',name:'טלסקופ יום 4* טריגון',total:40,note:''},
+    {cat:'טלסקופים יום',name:'טלסקופ יום טריגיקו X4',total:37,note:''},
+    {cat:'טלסקופים יום',name:'טלסקופ לרוב"צ בארט',total:1,note:''},
+    {cat:'טלסקופים יום',name:'טלסקופ MARK 5HD MIL',total:9,note:''},
+    {cat:'סמנים',name:'סמן AIM1-LR',total:27,note:''},
+    {cat:'סמנים',name:'סמן לייזר טאץ',total:63,note:''},
+    {cat:'סמנים',name:'סמן OGL איוטק',total:50,note:''},
+    {cat:'סמנים',name:'סמן תרמי לח"ר',total:1,note:''},
+    {cat:'סמנים',name:'סמן HHP דיוי',total:7,note:''},
+    {cat:'סמנים',name:'סמן לייזר לערמון',total:1,note:''},
+    {cat:'מצפנים',name:'מצפן יד מעלות פרז',total:9,note:''},
+    {cat:'מצפנים',name:'מצפן מעלות דל אחזקה',total:32,note:''},
+    {cat:'מצפנים',name:'מצפן אלפיות דל אחזקה',total:11,note:''},
+    {cat:'רחפנים',name:'רחפן מטריס 30 דואלי',total:2,note:''},
+    {cat:'רחפנים',name:'שלט מטריס 30T',total:2,note:''},
+    {cat:'רחפנים',name:'רחפן אבו מקס 4 תרמי',total:7,note:''},
+    {cat:'רחפנים',name:'שלט אבו מקס תרמי 4',total:7,note:''},
+    {cat:'רחפנים',name:'מתקן הטלה EvoMax',total:3,note:''},
+    {cat:'רחפנים',name:'כלי טיס אוטה',total:21,note:''},
+    {cat:'רחפנים',name:'משקפי מציאות מדומה אוטה',total:12,note:''},
+    {cat:'רחפנים',name:'שלט אוטה',total:12,note:''},
+    {cat:'רחפנים',name:'כלי טיס אלפא',total:1,note:''},
+    {cat:'רחפנים',name:'שלט אלפא',total:1,note:''},
+    {cat:'ציוד נוסף',name:'יראור צעיר M16 G-2',total:16,note:''},
+    {cat:'ציוד נוסף',name:'חצובה מערכת גיל',total:2,note:''},
+    {cat:'ציוד נוסף',name:'מד טווח מטלון ינאי',total:2,note:''},
+    {cat:'ציוד נוסף',name:'מאפס כוונת M-203',total:3,note:''},
+    {cat:'ציוד נוסף',name:'כוונת WG-III מחלקה',total:8,note:''},
+    {cat:'ציוד נוסף',name:'מצפן מור למפקד',total:30,note:''},
+    {cat:'ציוד נוסף',name:'THERMIS SR W',total:11,note:''},
+    {cat:'אחר',name:'וילון נהג לנגמ"ש',total:21,note:'7 לפי דרישה'},
+    {cat:'אחר',name:'סמן לייזר דיויד',total:6,note:''},
+    {cat:'אחר',name:'אל פי אל',total:3,note:''},
+    {cat:'אחר',name:'סמן לייזר למפצח ולאו',total:25,note:''},
+    {cat:'אחר',name:'סמן פקד',total:7,note:''},
+    // ── ציוד מגן
+    {cat:'נשק אישי',name:'וואסט(ציפית) קרמי',total:401,note:''},
+    {cat:'נשק אישי',name:'לוח קרמי(בודד)',total:800,note:''},
+    {cat:'נשק אישי',name:'קסדה טקטית',total:422,note:''},
+    // ── ויסות קשר (חפ"ק מג"ד נכלל במסייעת)
+    {cat:'ויסות קשר',name:'שקד מ"פ',total:4,note:'שקד לכל מ"פ'},
+    {cat:'ויסות קשר',name:'שקדון סמ"פ',total:3,note:'שקד לכל סמ"פ למעט מסייעת'},
+    {cat:'ויסות קשר',name:'שקדון',total:7,note:'ניוד, אוהדים, מג"ד, סמג"ד, קמ"ן קש"א'},
+    {cat:'ויסות קשר',name:'טל 100 (סל"צ)',total:9,note:'מג"ד, סמג"ד, מ"פ*5, מכלול, רופא'},
+    {cat:'ויסות קשר',name:'אול"ר',total:92,note:''},
+    {cat:'ויסות קשר',name:'710',total:67,note:''},
+    {cat:'ויסות קשר',name:'נר הלילה',total:4,note:'מצפין להאמרים ניוד'},
+    {cat:'ויסות קשר',name:'מגן מכלול',total:2,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'מדיה נתיקה',total:3,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'ברק רחוק',total:1,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'RPT',total:1,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'מחט"ק',total:2,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'דיסקית דיגיטלית',total:2,note:'מרגמות'},
+    {cat:'ויסות קשר',name:'טל 88',total:3,note:'קשר מג"ד, סמג"ד, קש"א'},
+  ];
+
+  const {data, error} = await sb.from('items').insert(seed).select();
+  if (error) { toast('שגיאה בטעינת נתונים ראשוניים', 'err'); return; }
+  items = data;
+
+  // seed distributions
+  const distRows = [];
+  const initDist = {
+    'M4':         {aleph:63,bet:50,gimel:78,mesayaat:106,agam:0,plasm:35},
+    'M4 קלע':    {aleph:18,bet:17,gimel:17,mesayaat:12,agam:0,plasm:0},
+    'M16':        {aleph:25,bet:11,gimel:18,mesayaat:18,agam:0,plasm:63},
+    'M320':                {aleph:10, bet:10, gimel:10, mesayaat:3,  agam:0, plasm:0},
+    // ── ציוד מגן
+    'וואסט(ציפית) קרמי':  {aleph:84, bet:74, gimel:60, mesayaat:114,agam:22,plasm:47},
+    'לוח קרמי(בודד)':     {aleph:170,bet:133,gimel:146,mesayaat:242,agam:42,plasm:67},
+    'קסדה טקטית':         {aleph:72, bet:60, gimel:84, mesayaat:98, agam:19,plasm:89},
+    // ── ויסות קשר — חפ"ק מג"ד נכלל בעמודת מסייעת (מסייעת + חפ"ק)
+    'שקד מ"פ':            {aleph:1,  bet:1,  gimel:1,  mesayaat:1,  agam:0, plasm:0},
+    'שקדון סמ"פ':         {aleph:1,  bet:1,  gimel:1,  mesayaat:0,  agam:0, plasm:0},
+    'שקדון':              {aleph:0,  bet:0,  gimel:0,  mesayaat:7,  agam:0, plasm:0},
+    "טל 100 (סל\"צ)":   {aleph:1,  bet:1,  gimel:1,  mesayaat:5,  agam:1, plasm:1},
+    'אול"ר':              {aleph:17, bet:17, gimel:17, mesayaat:37, agam:0, plasm:4},
+    '710':                {aleph:13, bet:13, gimel:13, mesayaat:24, agam:0, plasm:4},
+    'נר הלילה':           {aleph:0,  bet:0,  gimel:0,  mesayaat:4,  agam:0, plasm:0},
+    'מגן מכלול':          {aleph:0,  bet:0,  gimel:0,  mesayaat:2,  agam:0, plasm:0},
+    'מדיה נתיקה':         {aleph:0,  bet:0,  gimel:0,  mesayaat:3,  agam:0, plasm:0},
+    'ברק רחוק':           {aleph:0,  bet:0,  gimel:0,  mesayaat:1,  agam:0, plasm:0},
+    'RPT':                {aleph:0,  bet:0,  gimel:0,  mesayaat:1,  agam:0, plasm:0},
+    'מחט"ק':             {aleph:0,  bet:0,  gimel:0,  mesayaat:2,  agam:0, plasm:0},
+    'דיסקית דיגיטלית':   {aleph:0,  bet:0,  gimel:0,  mesayaat:2,  agam:0, plasm:0},
+    'טל 88':              {aleph:0,  bet:0,  gimel:0,  mesayaat:3,  agam:0, plasm:0},
+  };
+  items.forEach(it => {
+    const d = initDist[it.name] || {aleph:0,bet:0,gimel:0,mesayaat:0,plasm:0};
+    UNITS.forEach(u => distRows.push({item_id:it.id,unit:u.key,quantity:d[u.key]||0}));
+  });
+  const {data:dData, error:dErr} = await sb.from('distributions').insert(distRows).select();
+  if (!dErr) distributions = dData;
+}
+
+// ═══════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════
+function getDist(itemId, unit) {
+  const d = distributions.find(d => d.item_id === itemId && d.unit === unit);
+  return d ? d.quantity : 0;
+}
+
+function getInField(itemId) {
+  // sum of all outgoing minus incoming movements
+  const outs = movements.filter(m => m.item_id === itemId && m.action === 'out').reduce((a,m)=>a+m.quantity,0);
+  const ins  = movements.filter(m => m.item_id === itemId && m.action === 'in').reduce((a,m)=>a+m.quantity,0);
+  return Math.max(0, outs - ins);
+}
+
+function isPersonalWeapon(it) {
+  return ['100012066','100012073','100012332'].includes(it.makat);
+}
+
+function getPersonalWeaponsTotal() {
+  return items.filter(isPersonalWeapon).reduce((a,it)=>a+it.total,0);
+}
+
+function getPersonalWeaponsPerUnit(unit) {
+  return items.filter(isPersonalWeapon).reduce((a,it)=>a+getDist(it.id,unit),0);
+}
+
+function setSyncState(state, text) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot' + (state==='error'?' error':state==='loading'?' loading':'');
+  if(txt) txt.textContent = text;
+}
+
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.getElementById(id).addEventListener('click', function(e){
+    if(e.target===this) closeModal(id);
+  },{once:true});
+}
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// ═══════════════════════════════════════
+// PAGES
+// ═══════════════════════════════════════
+function showPage(name, btn, isMobile) {
+  document.querySelectorAll('.main > div[id^="page-"]').forEach(p=>p.style.display='none');
+  document.getElementById('page-'+name).style.display='block';
+  // Desktop nav
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  if(btn && !isMobile) btn.classList.add('active');
+  else if(!btn) {
+    // find and activate the right desktop nav button
+    document.querySelectorAll('.nav-item').forEach(b=>{
+      if(b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+name+"'")) b.classList.add('active');
+    });
+  }
+  // Mobile nav
+  document.querySelectorAll('.mobile-nav button').forEach(b=>b.classList.remove('active'));
+  const mBtn = document.getElementById('mnav-'+name);
+  if(mBtn) mBtn.classList.add('active');
+  window.scrollTo(0,0);
+  renderPage(name);
+}
+
+function renderAll() {
+  renderDashboard();
+  renderInventory();
+  renderDistribution();
+  renderMovements();
+  renderReport();
+}
+
+function renderPage(name) {
+  if(name==='dashboard') renderDashboard();
+  else if(name==='inventory') renderInventory();
+  else if(name==='distribution') renderDistribution();
+  else if(name==='movements') renderMovements();
+  else if(name==='report') renderReport();
+}
+
+
+// ═══════════════════════════════════════
+// PAGE: DASHBOARD
+// ═══════════════════════════════════════
+function renderDashboard() {
+  const totalItems = items.length;
+  const totalQty = items.reduce((a,it)=>a+it.total,0);
+  const inField = items.reduce((a,it)=>a+getInField(it.id),0);
+  const inStore = totalQty - inField;
+  const pw = getPersonalWeaponsTotal();
+
+  // ── Top stat cards
+  const statsHtml = `
+    <div class="dash-grid">
+      <div class="dash-card" onclick="showPage('inventory',null)">
+        <div class="dc-icon">📦</div>
+        <div class="dc-label">סה"כ סוגי פריטים</div>
+        <div class="dc-val" style="color:var(--accent)">${totalItems}</div>
+      </div>
+
+      <div class="dash-card" onclick="showPage('movements',null)">
+        <div class="dc-icon">🏕️</div>
+        <div class="dc-label">בשטח עכשיו</div>
+        <div class="dc-val" style="color:${inField>0?'var(--orange)':'var(--muted)'}">${inField}</div>
+      </div>
+      <div class="dash-card" onclick="showPage('inventory',null)">
+        <div class="dc-icon">🏛️</div>
+        <div class="dc-label">בנשקייה</div>
+        <div class="dc-val" style="color:var(--text)">${inStore}</div>
+      </div>
+    </div>`;
+
+  // ── Personal weapons per unit
+  const unitColors = {aleph:'#22c55e',bet:'#f59e0b',gimel:'#a78bfa',mesayaat:'#f43f5e',plasm:'#06b6d4'};
+  const unitLabels = {aleph:"א'",bet:"ב'",gimel:"ג'",mesayaat:'מסייעת',agam:'אגם',plasm:'פלסם'};
+  let unitHtml = '<div class="dash-section-title">נשק אישי לפי פלוגה</div><div class="unit-grid">';
+  UNITS.forEach(u => {
+    const uPw = getPersonalWeaponsPerUnit(u.key);
+    const pct = pw > 0 ? Math.round(uPw/pw*100) : 0;
+    unitHtml += `<div class="unit-card" style="border-color:${u.color}22;border-right:3px solid ${u.color}">
+      <div class="uc-label" style="color:${u.color}">${u.label}</div>
+      <div class="uc-num">${uPw}</div>
+      <div class="uc-sub">${pct}%</div>
+    </div>`;
+  });
+  unitHtml += '</div>';
+
+  // ── AI Alerts
+  const alerts = generateAlerts();
+  let alertsHtml = '<div class="dash-section-title">🤖 המלצות והתראות</div><div class="alert-list">';
+  if(alerts.length === 0) {
+    alertsHtml += '<div class="alert-item info"><div class="ai-icon">✅</div><div class="ai-text"><strong>הכל תקין</strong>אין התראות פעילות כרגע</div></div>';
+  } else {
+    alerts.forEach(a => {
+      alertsHtml += `<div class="alert-item ${a.level}">
+        <div class="ai-icon">${a.icon}</div>
+        <div class="ai-text">
+          <strong>${a.title}</strong>${a.body}
+          ${a.action ? `<div class="ai-action"><button class="btn" style="padding:4px 10px;font-size:0.75rem" onclick="${a.action}">${a.actionLabel}</button></div>` : ''}
+        </div>
+      </div>`;
+    });
+  }
+  alertsHtml += '</div>';
+
+  // ── Recent movements
+  const recent = movements.slice(0, 6);
+  let recentHtml = '<div class="dash-section-title">תנועות אחרונות</div>';
+  if(recent.length === 0) {
+    recentHtml += '<div style="color:var(--muted);font-size:0.85rem;padding:12px 0">אין תנועות עדיין</div>';
+  } else {
+    recentHtml += '<div class="recent-list">';
+    recent.forEach(m => {
+      const it = items.find(i=>i.id===m.item_id);
+      const name = it ? it.name : '—';
+      const isOut = m.action==='out';
+      const dt = new Date(m.created_at).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'});
+      recentHtml += `<div class="recent-item">
+        <div class="ri-icon">${isOut?'📤':'📥'}</div>
+        <div class="ri-text"><strong>${name}</strong> · פלוגה ${unitLabels[m.unit]||m.unit} · ${m.person_name||''} · ${dt}</div>
+        <div class="ri-qty ${isOut?'out':'in'}">${isOut?'-':'+'}${m.quantity}</div>
+      </div>`;
+    });
+    recentHtml += '</div>';
+  }
+
+  document.getElementById('dashContent').innerHTML = statsHtml + unitHtml + alertsHtml + recentHtml;
+
+  // sync dot in dashboard topbar
+  const dot2 = document.getElementById('syncDot2');
+  const txt2 = document.getElementById('syncText2');
+  const dot1 = document.getElementById('syncDot');
+  if(dot2 && dot1) dot2.className = dot1.className;
+  if(txt2) { const t1 = document.getElementById('syncText'); if(t1) txt2.textContent = t1.textContent; }
+}
+
+function generateAlerts() {
+  const alerts = [];
+  const unitLabels = {aleph:"א'",bet:"ב'",gimel:"ג'",mesayaat:'מסייעת',agam:'אגם',plasm:'פלסם'};
+
+  // 1. Items with zero distribution
+  const undistributed = items.filter(it => {
+    const total = UNITS.reduce((a,u)=>a+getDist(it.id,u.key),0);
+    return total === 0 && it.total > 0;
+  });
+  if(undistributed.length > 0) {
+    alerts.push({
+      level:'warn', icon:'⚠️',
+      title: `${undistributed.length} פריטים לא חולקו`,
+      body: undistributed.slice(0,3).map(it=>it.name).join(', ') + (undistributed.length>3?` ועוד ${undistributed.length-3}`:''),
+      action: "showPage('distribution',null)", actionLabel: 'עבור לחלוקה'
+    });
+  }
+
+  // 2. Items where distributed > total
+  const overDist = items.filter(it => {
+    const total = UNITS.reduce((a,u)=>a+getDist(it.id,u.key),0);
+    return total > it.total;
+  });
+  if(overDist.length > 0) {
+    alerts.push({
+      level:'danger', icon:'🔴',
+      title: `${overDist.length} פריטים חולקו יותר מהמלאי`,
+      body: overDist.map(it=>it.name).join(', '),
+      action: "showPage('distribution',null)", actionLabel: 'תקן חלוקה'
+    });
+  }
+
+  // 3. Unequal distribution between combat units (more than 20% gap)
+  const combatUnits = ['aleph','bet','gimel'];
+  const unequalItems = items.filter(it => {
+    const vals = combatUnits.map(u=>getDist(it.id,u)).filter(v=>v>0);
+    if(vals.length < 2) return false;
+    const max = Math.max(...vals), min = Math.min(...vals);
+    return max > 0 && (max-min)/max > 0.3;
+  });
+  if(unequalItems.length > 0) {
+    alerts.push({
+      level:'warn', icon:'⚖️',
+      title: `חלוקה לא שווה ב-${unequalItems.length} פריטים`,
+      body: 'פער של מעל 30% בין פלוגות הקרב: ' + unequalItems.slice(0,2).map(it=>it.name).join(', '),
+      action: "autoDistributeFromDash()", actionLabel: '⚡ חלק שווה אוטומטית'
+    });
+  }
+
+  // 4. Items in field (outstanding movements)
+  const longOutItems = items.filter(it => getInField(it.id) > 0);
+  if(longOutItems.length > 0) {
+    const total = longOutItems.reduce((a,it)=>a+getInField(it.id),0);
+    alerts.push({
+      level:'info', icon:'🏕️',
+      title: `${total} פריטים בשטח`,
+      body: longOutItems.slice(0,3).map(it=>`${it.name} (${getInField(it.id)})`).join(', '),
+      action: "showPage('movements',null)", actionLabel: 'צפה בתנועות'
+    });
+  }
+
+  return alerts;
+}
+
+async function autoDistributeFromDash() {
+  autoDistribute();
+  await saveDistribution();
+  renderDashboard();
+}
+
+// ═══════════════════════════════════════
+// PAGE: INVENTORY
+// ═══════════════════════════════════════
+function renderInventory() {
+  const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
+
+  // Stats
+  const total = items.reduce((a,it)=>a+it.total,0);
+  const inField = items.reduce((a,it)=>a+getInField(it.id),0);
+  const pw = getPersonalWeaponsTotal();
+  document.getElementById('invStats').innerHTML = `
+    <div class="stat-chip"><div class="s-label">סה"כ פריטים</div><div class="s-val" style="color:var(--accent)">${items.length}</div></div>
+    <div class="stat-chip"><div class="s-label">סה"כ נשק אישי</div><div class="s-val" style="color:var(--green)">${pw}</div><div class="s-sub">M4 + M4 קלע + M16</div></div>
+    <div class="stat-chip"><div class="s-label">בשטח כרגע</div><div class="s-val" style="color:var(--orange)">${inField}</div></div>
+    <div class="stat-chip"><div class="s-label">כמות כוללת</div><div class="s-val">${total}</div></div>
+  `;
+
+  // Table
+  const cats = [...new Set(items.map(it=>it.cat))];
+  let html = '';
+  cats.forEach(cat => {
+    const catItems = items.filter(it => it.cat===cat && (!q || it.name.toLowerCase().includes(q) || it.cat.toLowerCase().includes(q)));
+    if(!catItems.length) return;
+    html += `<tr class="cat-row"><td colspan="7">${cat}</td></tr>`;
+    catItems.forEach(it => {
+      const inF = getInField(it.id);
+      const inStore = it.total - inF;
+      html += `<tr>
+          <td></td>
+          <td style="font-size:0.73rem;font-family:monospace;color:var(--muted);padding:9px 8px">${it.makat||'—'}</td>
+          <td class="item-name">${it.name}</td>
+          <td class="center">${canEdit
+            ? `<input class="qty-input" type="number" min="0" value="${it.total}" onchange="updateItemTotal(${it.id},this.value)" style="width:65px">`
+            : it.total}</td>
+          <td class="center" style="color:${inF>0?'var(--orange)':'var(--muted)'};font-weight:${inF>0?700:400}">${inF}</td>
+          <td class="center" style="color:${inStore<0?'var(--red)':'var(--text)'}">${Math.max(0,inStore)}</td>
+          <td class="note-cell">${canEdit
+            ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${it.note||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
+            : (it.note||'')}</td>
+          <td>${canEdit ? `<button class="btn danger" style="padding:3px 8px;font-size:0.72rem" onclick="deleteItem(${it.id})">🗑</button>` : ''}</td>
+        </tr>`;
+    });
+  });
+
+  document.getElementById('invBody').innerHTML = html;
+
+  // Populate add modal cats
+  const sel = document.getElementById('newItemCat');
+  if(sel) {
+    sel.innerHTML = '<option value="">-- בחר --</option>';
+    CATS.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
+    sel.innerHTML += '<option value="__new__">+ חדשה</option>';
+  }
+}
+
+async function updateMakat(id, val) {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  const {error} = await sb.from('items').update({makat:val}).eq('id',id);
+  if(error){toast('שגיאה בעדכון','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(it) it.makat = val;
+  toast('מק"ט עודכן ✓');
+}
+
+async function updateName(id, val) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const name = val.trim();
+  if(!name) return;
+  const {error} = await sb.from('items').update({name}).eq('id',id);
+  if(error){toast('שגיאה בעדכון','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(it) it.name = name;
+  toast('שם עודכן ✓');
+}
+
+async function updateNote(id, val) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const {error} = await sb.from('items').update({note:val}).eq('id',id);
+  if(error){toast('שגיאה בעדכון','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(it) it.note = val;
+  toast('הערה עודכנה ✓');
+}
+
+async function updateItemTotal(id, val) {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  const v = Math.max(0, parseInt(val)||0);
+  const {error} = await sb.from('items').update({total:v}).eq('id',id);
+  if(error){toast('שגיאה בעדכון','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(it) it.total = v;
+  renderAll();
+  toast('עודכן ✓');
+}
+
+async function deleteItem(id) {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  if(!confirm('למחוק פריט זה?')) return;
+  const {error} = await sb.from('items').delete().eq('id',id);
+  if(error){toast('שגיאה במחיקה','err');return;}
+  items = items.filter(i=>i.id!==id);
+  distributions = distributions.filter(d=>d.item_id!==id);
+  movements = movements.filter(m=>m.item_id!==id);
+  renderAll();
+  toast('נמחק');
+}
+
+async function addItem() {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  let cat = document.getElementById('newItemCat').value;
+  const makat = document.getElementById('newItemMakat').value.trim();
+  const name = document.getElementById('newItemName').value.trim();
+  const total = parseInt(document.getElementById('newItemTotal').value)||0;
+  const note = document.getElementById('newItemNote').value.trim();
+  if(!cat||!name){toast('יש להזין קטגוריה ושם','err');return;}
+  if(cat==='__new__'){
+    cat = prompt('שם הקטגוריה:');
+    if(!cat) return;
+  }
+  const {data,error} = await sb.from('items').insert({cat,name,total,note,makat}).select().single();
+  if(error){toast('שגיאה בהוספה','err');return;}
+  items.push(data);
+  // add dist rows
+  const distRows = UNITS.map(u=>({item_id:data.id,unit:u.key,quantity:0}));
+  const {data:dRows} = await sb.from('distributions').insert(distRows).select();
+  if(dRows) distributions.push(...dRows);
+  closeModal('addItemModal');
+  renderAll();
+  toast('פריט נוסף ✓');
+}
+
+// ═══════════════════════════════════════
+// PAGE: DISTRIBUTION
+// ═══════════════════════════════════════
+let pendingDist = {}; // itemId_unit -> qty
+
+function renderDistribution() {
+  const units = distFilter==='all' ? UNITS : UNITS.filter(u=>u.key===distFilter);
+
+  // Stats — personal weapons per unit
+  const pw = getPersonalWeaponsTotal();
+  let statsHtml = `<div class="stat-chip"><div class="s-label">סה"כ נשק אישי</div><div class="s-val" style="color:var(--accent)">${pw}</div></div>`;
+  UNITS.forEach(u => {
+    const uPw = getPersonalWeaponsPerUnit(u.key);
+    statsHtml += `<div class="stat-chip"><div class="s-label">${u.label}</div><div class="s-val" style="color:${u.color}">${uPw}</div></div>`;
+  });
+  document.getElementById('distStats').innerHTML = statsHtml;
+
+  // Head
+  let headHtml = '<tr><th>פריט</th><th class="center">כולל</th>';
+  units.forEach(u => headHtml += `<th class="center" style="color:${u.color}">${u.label}</th>`);
+  headHtml += '<th class="center">מחולק</th><th class="center">פער</th><th>הערות</th></tr>';
+  document.getElementById('distHead').innerHTML = headHtml;
+
+  // Body
+  const cats = [...new Set(items.map(it=>it.cat))];
+  let html = '';
+  cats.forEach(cat => {
+    const catItems = items.filter(it=>it.cat===cat);
+    if(!catItems.length) return;
+    html += `<tr class="cat-row"><td colspan="${3+units.length+2}">${cat}</td></tr>`;
+    catItems.forEach(it => {
+      const assigned = UNITS.reduce((a,u)=>a+getDist(it.id,u.key),0);
+      const gap = it.total - assigned;
+      const gapHtml = gap===0
+        ? '<span class="gap zero">✓</span>'
+        : gap>0
+          ? `<span class="gap ok">+${gap}</span>`
+          : `<span class="gap over">${gap}</span>`;
+
+      let cells = '';
+      units.forEach(u => {
+        const val = pendingDist[`${it.id}_${u.key}`] ?? getDist(it.id,u.key);
+        cells += `<td class="center"><input class="qty-input" type="number" min="0" value="${val}"
+          oninput="stageDist(${it.id},'${u.key}',this.value)"></td>`;
+      });
+
+      html += `<tr>
+        <td class="item-name">${it.name}</td>
+        <td class="center">${it.total}</td>
+        ${cells}
+        <td class="center">${assigned}</td>
+        <td class="center">${gapHtml}</td>
+        <td class="note-cell">${it.note||''}</td>
+      </tr>`;
+    });
+  });
+  document.getElementById('distBody').innerHTML = html;
+}
+
+function setDistFilter(f, el) {
+  distFilter = f;
+  document.querySelectorAll('#distUnitBar .upill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderDistribution();
+}
+
+function stageDist(itemId, unit, val) {
+  pendingDist[`${itemId}_${unit}`] = Math.max(0,parseInt(val)||0);
+}
+
+async function saveDistribution() {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  if(!Object.keys(pendingDist).length){toast('אין שינויים לשמור');return;}
+  const updates = [];
+  for(const key of Object.keys(pendingDist)) {
+    const [itemId, unit] = key.split('_');
+    updates.push({item_id:parseInt(itemId), unit, quantity:pendingDist[key]});
+  }
+
+  // upsert
+  const {error} = await sb.from('distributions').upsert(updates, {onConflict:'item_id,unit'});
+  if(error){toast('שגיאה בשמירה','err');return;}
+
+  // update local state
+  updates.forEach(u => {
+    const existing = distributions.find(d=>d.item_id===u.item_id&&d.unit===u.unit);
+    if(existing) existing.quantity = u.quantity;
+    else distributions.push(u);
+  });
+  pendingDist = {};
+  renderAll();
+  toast('החלוקה נשמרה ✓');
+}
+
+function autoDistribute() {
+  const combatUnits = ['aleph','bet','gimel'];
+  items.forEach(it => {
+    const specialAssigned = UNITS.filter(u=>u.key==='mesayaat'||u.key==='plasm').reduce((a,u)=>a+getDist(it.id,u.key),0);
+    const available = Math.max(0, it.total - specialAssigned);
+    const perUnit = Math.floor(available/combatUnits.length);
+    const rem = available % combatUnits.length;
+    combatUnits.forEach((u,i) => {
+      pendingDist[`${it.id}_${u}`] = perUnit + (i<rem?1:0);
+    });
+  });
+  renderDistribution();
+  toast('חולק שווה בשווה — לחץ שמור לאישור');
+}
+
+// ═══════════════════════════════════════
+// PAGE: MOVEMENTS
+// ═══════════════════════════════════════
+function renderMovements() {
+  const filtered = movFilter==='all' ? movements : movements.filter(m=>m.unit===movFilter);
+  if(!filtered.length) {
+    document.getElementById('movList').innerHTML = '<div class="empty"><div class="e-icon">📭</div>אין תנועות עדיין</div>';
+    return;
+  }
+  const html = filtered.map(m => {
+    const it = items.find(i=>i.id===m.item_id);
+    const name = it ? it.name : 'פריט לא ידוע';
+    const isOut = m.action==='out';
+    const dt = new Date(m.created_at).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<div class="mov-card">
+      <div class="mov-icon">${isOut?'📤':'📥'}</div>
+      <div class="mov-info">
+        <div class="mov-title">${name}</div>
+        <div class="mov-meta">פלוגה ${UNIT_LABELS[m.unit]||m.unit} • ${m.person_name||'—'} • ${dt}${m.note?' • '+m.note:''}</div>
+      </div>
+      <div class="mov-qty ${isOut?'out':'in'}">${isOut?'-':'+'}${m.quantity}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('movList').innerHTML = html;
+}
+
+function setMovFilter(f, el) {
+  movFilter = f;
+  document.querySelectorAll('#page-movements .unit-bar .upill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  renderMovements();
+}
+
+function openMovModal(action) {
+  document.getElementById('movAction').value = action;
+  document.getElementById('movModalTitle').textContent = action==='out' ? '📤 רישום יציאה' : '📥 רישום החזרה';
+  document.getElementById('movSubmitBtn').textContent = action==='out' ? 'רשום יציאה' : 'רשום החזרה';
+
+  const sel = document.getElementById('movItem');
+  sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name} (${it.cat})</option>`).join('');
+  openModal('movModal');
+}
+
+async function submitMovement() {
+  if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
+  const action = document.getElementById('movAction').value;
+  const itemId = parseInt(document.getElementById('movItem').value);
+  const unit = document.getElementById('movUnit').value;
+  const qty = parseInt(document.getElementById('movQty').value)||0;
+  const person = document.getElementById('movPerson').value.trim();
+  const note = document.getElementById('movNote').value.trim();
+
+  if(!qty || qty<=0){toast('כמות חייבת להיות גדולה מ-0','err');return;}
+
+  const {data,error} = await sb.from('movements').insert({
+    item_id:itemId, unit, action, quantity:qty, person_name:person, note
+  }).select().single();
+
+  if(error){toast('שגיאה ברישום','err');return;}
+  movements.unshift(data);
+  closeModal('movModal');
+  renderAll();
+  toast((action==='out'?'יציאה':'החזרה') + ' נרשמה ✓');
+}
+
+// ═══════════════════════════════════════
+// PAGE: REPORT
+// ═══════════════════════════════════════
+function renderReport() {
+  const now = new Date().toLocaleDateString('he-IL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const pw = getPersonalWeaponsTotal();
+  const pwByUnit = UNITS.map(u=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+    <span>${u.label}</span><strong style="color:${u.color}">${getPersonalWeaponsPerUnit(u.key)}</strong>
+  </div>`).join('');
+
+  const cats = [...new Set(items.map(it=>it.cat))];
+  const catSections = cats.map(cat => {
+    const catItems = items.filter(it=>it.cat===cat);
+    const rows = catItems.map(it => {
+      const tags = UNITS.map(u=>{
+        const q = getDist(it.id,u.key);
+        if(!q) return '';
+        return `<span class="ri-unit-tag" style="background:${u.color}22;color:${u.color}">
+          ${u.label}: ${q}
+        </span>`;
+      }).join('');
+      return `<div class="report-item">
+        <div class="ri-name">${it.name}</div>
+        <div style="font-size:0.8rem;color:var(--muted)">כולל: ${it.total}</div>
+        <div class="ri-units">${tags||'<span style="font-size:0.7rem;color:var(--muted)">לא חולק</span>'}</div>
+      </div>`;
+    }).join('');
+    return `<div class="report-section"><h3>${cat}</h3><div class="report-grid">${rows}</div></div>`;
+  }).join('');
+
+  document.getElementById('reportContent').innerHTML = `
+    <div class="report-section" style="background:var(--s2)">
+      <h3>דיווח מלאי — ${now}</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px">
+        <div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:4px">סה"כ נשק אישי (M4+M4 קלע+M16)</div>
+          <div style="font-size:2rem;font-weight:800;color:var(--accent)">${pw}</div>
+        </div>
+        <div>${pwByUnit}</div>
+      </div>
+    </div>
+    ${catSections}
+  `;
+}
+
+function printReport() {
+  window.print();
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+// loadAll() is called by auth
+</script>
+
+<!-- MOBILE BOTTOM NAV -->
+<div class="mobile-nav" style="display:none" id="mobileNav">
+  <button class="active" id="mnav-dashboard" onclick="showPage('dashboard',this,true)">
+    <span class="icon">🏠</span><span>בית</span>
+  </button>
+  <button id="mnav-inventory" onclick="showPage('inventory',this,true)">
+    <span class="icon">📦</span><span>מלאי</span>
+  </button>
+  <button id="mnav-distribution" onclick="showPage('distribution',this,true)">
+    <span class="icon">⚖️</span><span>חלוקה</span>
+  </button>
+  <button id="mnav-movements" onclick="showPage('movements',this,true)">
+    <span class="icon">🔄</span><span>תנועות</span>
+  </button>
+  <button id="mnav-report" onclick="showPage('report',this,true)">
+    <span class="icon">📋</span><span>דיווח</span>
+  </button>
+</div>
+</body>
+</html>
