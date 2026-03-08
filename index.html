@@ -393,6 +393,9 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     <button class="nav-item" onclick="showPage('report',this)">
       <span class="icon">📋</span><span>דיווח</span>
     </button>
+    <button class="nav-item" id="navCategories" onclick="showPage('categories',this)" style="display:none">
+      <span class="icon">🏷️</span><span>קטגוריות</span>
+    </button>
   </nav>
   <div class="sync-status">
     <div class="sync-dot" id="syncDot"></div>
@@ -518,6 +521,15 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     <div class="content" id="reportContent"></div>
   </div>
 
+  <div id="page-categories" style="display:none">
+    <div class="topbar">
+      <h2>🏷️ ניהול קטגוריות</h2>
+    </div>
+    <div class="content">
+      <div id="catList" style="max-width:500px;margin:0 auto"></div>
+    </div>
+  </div>
+
 </div><!-- /main -->
 </div><!-- /layout -->
 
@@ -599,6 +611,18 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
 <script>
 
 // ═══════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════
+function esc(str) {
+  return String(str||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ═══════════════════════════════════════
 // AUTH
 // ═══════════════════════════════════════
 const EDIT_PASSWORD = 'Gdud92202026!';
@@ -611,6 +635,7 @@ function tryAuth() {
     document.getElementById('authOverlay').style.display = 'none';
     setTimeout(loadAll, 100);
     toast('ברוך הבא — מצב עריכה ✓');
+    document.getElementById('navCategories').style.display = '';
   } else {
     document.getElementById('authErr').textContent = 'סיסמה שגויה';
     document.getElementById('authInput').value = '';
@@ -942,6 +967,7 @@ function renderAll() {
 function renderPage(name) {
   if(name==='dashboard') renderDashboard();
   else if(name==='inventory') renderInventory();
+  else if(name==='categories') renderCategories();
   else if(name==='distribution') renderDistribution();
   else if(name==='movements') renderMovements();
   else if(name==='report') renderReport();
@@ -1143,14 +1169,14 @@ function renderInventory() {
       html += `<tr>
           <td></td>
           <td style="font-size:0.73rem;font-family:monospace;color:var(--muted);padding:9px 8px">${it.makat||'—'}</td>
-          <td class="item-name">${it.name}</td>
+          <td class="item-name">${esc(it.name)}</td>
           <td class="center">${canEdit
             ? `<input class="qty-input" type="number" min="0" value="${it.total}" onchange="updateItemTotal(${it.id},this.value)" style="width:65px">`
             : it.total}</td>
           <td class="center" style="color:${inF>0?'var(--orange)':'var(--muted)'};font-weight:${inF>0?700:400}">${inF}</td>
           <td class="center" style="color:${inStore<0?'var(--red)':'var(--text)'}">${Math.max(0,inStore)}</td>
           <td class="note-cell">${canEdit
-            ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${it.note||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
+            ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${esc(it.note||'')||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
             : (it.note||'')}</td>
           <td style="white-space:nowrap">${canEdit ? `
             <button class="btn" style="padding:3px 8px;font-size:0.72rem;margin-left:3px" onclick="openEditItem(${it.id})">✏️</button>
@@ -1200,6 +1226,41 @@ async function saveEditItem() {
   closeModal('editItemModal');
   renderInventory();
   toast('פריט עודכן ✓');
+}
+
+function renderCategories() {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const cats = [...new Set(items.map(i=>i.cat).filter(Boolean))].sort();
+  const el = document.getElementById('catList');
+  if(!el) return;
+  el.innerHTML = cats.map(cat => {
+    const count = items.filter(i=>i.cat===cat).length;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s1);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">
+      <span style="flex:1;font-weight:500">${esc(cat)}</span>
+      <span style="font-size:0.78rem;color:var(--muted)">${count} פריטים</span>
+      <button class="btn primary" style="padding:4px 12px;font-size:0.8rem" onclick="openRenamecat('${esc(cat)}')">✏️ שנה שם</button>
+    </div>`;
+  }).join('');
+}
+
+function openRenamecat(cat) {
+  const newName = prompt('שם חדש לקטגוריה "' + cat + '":', cat);
+  if(!newName || newName.trim()==='' || newName.trim()===cat) return;
+  renameCategory(cat, newName.trim());
+}
+
+async function renameCategory(oldCat, newCat) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  // Update all items with oldCat to newCat
+  const affected = items.filter(i=>i.cat===oldCat);
+  if(!affected.length){toast('לא נמצאו פריטים','err');return;}
+  const ids = affected.map(i=>i.id);
+  const {error} = await sb.from('items').update({cat:newCat}).in('id',ids);
+  if(error){toast('שגיאה בעדכון: '+error.message,'err');return;}
+  // Update local data
+  affected.forEach(i=>i.cat=newCat);
+  toast(`קטגוריה עודכנה ✓ (${affected.length} פריטים)`);
+  renderCategories();
 }
 
 async function updateMakat(id, val) {
@@ -1325,7 +1386,7 @@ function renderDistribution() {
       });
 
       html += `<tr>
-        <td class="item-name">${it.name}</td>
+        <td class="item-name">${esc(it.name)}</td>
         <td class="center">${it.total}</td>
         ${cells}
         <td class="center">${assigned}</td>
