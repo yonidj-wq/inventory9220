@@ -1156,7 +1156,9 @@ function renderInventory() {
           <td class="note-cell">${canEdit
             ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${it.note||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
             : (it.note||'')}</td>
-          <td>${canEdit ? `<button class="btn danger" style="padding:3px 8px;font-size:0.72rem" onclick="deleteItem(${it.id})">🗑</button>` : ''}</td>
+          <td style="white-space:nowrap">${canEdit ? `
+            <button class="btn" style="padding:3px 8px;font-size:0.72rem;margin-left:3px" onclick="openEditItem(${it.id})">✏️</button>
+            <button class="btn danger" style="padding:3px 8px;font-size:0.72rem" onclick="deleteItem(${it.id})">🗑</button>` : ''}</td>
         </tr>`;
     });
   });
@@ -1170,6 +1172,35 @@ function renderInventory() {
     CATS.forEach(c => sel.innerHTML += `<option value="${c}">${c}</option>`);
     sel.innerHTML += '<option value="__new__">+ חדשה</option>';
   }
+}
+
+
+function openEditItem(id) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  document.getElementById('editItemId').value = id;
+  document.getElementById('editMakat').value = it.makat||'';
+  document.getElementById('editName').value = it.name||'';
+  document.getElementById('editCat').value = it.cat||'';
+  document.getElementById('editNote').value = it.note||'';
+  openModal('editItemModal');
+}
+
+async function saveEditItem() {
+  const id = parseInt(document.getElementById('editItemId').value);
+  const makat = document.getElementById('editMakat').value.trim();
+  const name  = document.getElementById('editName').value.trim();
+  const cat   = document.getElementById('editCat').value.trim();
+  const note  = document.getElementById('editNote').value.trim();
+  if(!name){toast('חובה למלא שם','err');return;}
+  const {error} = await sb.from('items').update({makat,name,cat,note}).eq('id',id);
+  if(error){toast('שגיאה בשמירה','err');return;}
+  const it = items.find(i=>i.id===id);
+  if(it){it.makat=makat;it.name=name;it.cat=cat;it.note=note;}
+  closeModal('editItemModal');
+  renderInventory();
+  toast('פריט עודכן ✓');
 }
 
 async function updateMakat(id, val) {
@@ -1494,6 +1525,34 @@ function printReport() {
   <button id="mnav-report" onclick="showPage('report',this,true)">
     <span class="icon">📋</span><span>דיווח</span>
   </button>
+</div>
+
+<!-- EDIT ITEM MODAL -->
+<div class="modal" id="editItemModal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-title">✏️ עריכת פריט</div>
+    <div class="form-group">
+      <label>מק"ט</label>
+      <input type="text" id="editMakat" placeholder="מספר קטלוגי" style="font-family:monospace">
+    </div>
+    <div class="form-group">
+      <label>שם פריט</label>
+      <input type="text" id="editName" placeholder="שם הפריט">
+    </div>
+    <div class="form-group">
+      <label>קטגוריה</label>
+      <input type="text" id="editCat" placeholder="קטגוריה">
+    </div>
+    <div class="form-group">
+      <label>הערה</label>
+      <input type="text" id="editNote" placeholder="הערה">
+    </div>
+    <input type="hidden" id="editItemId">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('editItemModal')">ביטול</button>
+      <button class="btn primary" onclick="saveEditItem()">💾 שמור</button>
+    </div>
+  </div>
 </div>
 </body>
 </html>
