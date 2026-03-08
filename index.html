@@ -130,8 +130,8 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
 .mov-qty.in{color:var(--green)}
 
 /* ── MODAL ── */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s}
-.modal-bg.open{opacity:1;pointer-events:all}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;visibility:hidden;transition:opacity 0.2s}
+.modal-bg.open{opacity:1;pointer-events:all;visibility:visible}
 .modal{background:var(--s1);border:1px solid var(--border2);border-radius:14px;padding:28px;width:min(480px,92vw);max-height:90vh;overflow-y:auto}
 .modal h3{font-size:1.05rem;font-weight:700;margin-bottom:18px}
 .form-group{margin-bottom:14px}
@@ -608,7 +608,6 @@ function tryAuth() {
   const val = document.getElementById('authInput').value;
   if(val === EDIT_PASSWORD) {
     canEdit = true;
-    sessionStorage.setItem('canEdit','1');
     document.getElementById('authOverlay').style.display = 'none';
     setTimeout(loadAll, 100);
     toast('ברוך הבא — מצב עריכה ✓');
@@ -624,12 +623,9 @@ function enterReadonly() {
   setTimeout(loadAll, 100);
 }
 
-// Check session
-if(sessionStorage.getItem('canEdit')==='1') {
-  canEdit = true;
-  document.getElementById('authOverlay').style.display = 'none';
-  setTimeout(loadAll, 100);
-}
+// Always clear session on load - require password each time
+sessionStorage.removeItem('canEdit');
+canEdit = false;
 
 function guardEdit(fn) {
   if(!canEdit) { toast('מצב צפייה בלבד — נדרשת סיסמה', 'err'); return false; }
@@ -1182,8 +1178,11 @@ function openEditItem(id) {
   document.getElementById('editItemId').value = id;
   document.getElementById('editMakat').value = it.makat||'';
   document.getElementById('editName').value = it.name||'';
-  document.getElementById('editCat').value = it.cat||'';
   document.getElementById('editNote').value = it.note||'';
+  // Populate category dropdown from actual data
+  const allCats = [...new Set(items.map(i=>i.cat).filter(Boolean))].sort();
+  const sel = document.getElementById('editCat');
+  sel.innerHTML = allCats.map(cat => `<option value="${cat}" ${cat===it.cat?'selected':''}>${cat}</option>`).join('');
   openModal('editItemModal');
 }
 
@@ -1528,8 +1527,8 @@ function printReport() {
 </div>
 
 <!-- EDIT ITEM MODAL -->
-<div class="modal" id="editItemModal">
-  <div class="modal-box" style="max-width:420px">
+<div class="modal-bg" id="editItemModal">
+  <div class="modal" style="max-width:420px">
     <div class="modal-title">✏️ עריכת פריט</div>
     <div class="form-group">
       <label>מק"ט</label>
@@ -1541,7 +1540,7 @@ function printReport() {
     </div>
     <div class="form-group">
       <label>קטגוריה</label>
-      <input type="text" id="editCat" placeholder="קטגוריה">
+      <select id="editCat" style="width:100%;padding:8px;border-radius:8px;background:var(--s2);color:var(--text);border:1px solid var(--border2)"></select>
     </div>
     <div class="form-group">
       <label>הערה</label>
@@ -1556,4 +1555,3 @@ function printReport() {
 </div>
 </body>
 </html>
-  
