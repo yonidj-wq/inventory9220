@@ -600,6 +600,10 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
       <label>שם האחראי</label>
       <input type="text" id="movPerson" placeholder="שם ודרגה">
     </div>
+    <div class="form-group" id="serialRow" style="display:none">
+      <label>מספר צ" <span style="font-size:0.78rem;color:var(--muted)">(אופציונלי)</span></label>
+      <input type="number" id="movSerial" placeholder='מספר צ" של הפריט'>
+    </div>
     <div class="form-group">
       <label>הערה</label>
       <input type="text" id="movNote" placeholder="הערה אופציונלי">
@@ -1170,7 +1174,6 @@ function renderInventory() {
             ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${it.note||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
             : (it.note||'')}</td>
           <td style="white-space:nowrap">${canEdit ? `
-            <button class="btn" style="padding:3px 8px;font-size:0.72rem;margin-left:3px" onclick="openSerialModal(${it.id})">🔢</button>
             <button class="btn" style="padding:3px 8px;font-size:0.72rem;margin-left:3px" onclick="openEditItem(${it.id})">✏️</button>
             <button class="btn danger" style="padding:3px 8px;font-size:0.72rem" onclick="deleteItem(${it.id})">🗑</button>` : ''}</td>
         </tr>`;
@@ -1217,166 +1220,6 @@ async function saveEditItem() {
   closeModal('editItemModal');
   renderInventory();
   toast('פריט עודכן ✓');
-}
-
-
-// ═══════════════════════════════════════
-// SERIAL NUMBERS (מספרי צ")
-// ═══════════════════════════════════════
-let serials = []; // {id, item_id, serial_num, unit, created_at}
-let confirmations = []; // {id, unit, date, confirmed_by, note}
-
-async function loadSerials() {
-  const [sRes, cRes] = await Promise.all([
-    sb.from('serial_numbers').select('*').order('serial_num'),
-    sb.from('serial_confirmations').select('*').order('date', {ascending:false}).limit(500)
-  ]);
-  if(!sRes.error) serials = sRes.data || [];
-  if(!cRes.error) confirmations = cRes.data || [];
-}
-
-function openSerialModal(itemId) {
-  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
-  const it = items.find(i=>i.id===itemId);
-  if(!it) return;
-  document.getElementById('serialModal').dataset.itemId = itemId;
-  document.getElementById('serialModalItemName').textContent = it.name + ' — ' + it.cat;
-  // Populate unit select
-  const sel = document.getElementById('serialUnitSelect');
-  sel.innerHTML = UNITS.map(u=>`<option value="${u.key}">${u.label}</option>`).join('');
-  renderSerialsList(itemId);
-  openModal('serialModal');
-}
-
-function renderSerialsList(itemId) {
-  const itemSerials = serials.filter(s=>s.item_id===itemId);
-  const el = document.getElementById('serialsList');
-  if(!itemSerials.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:0.85rem;text-align:center;padding:12px">אין מספרי צ" רשומים</div>';
-    return;
-  }
-  // Group by unit
-  const byUnit = {};
-  itemSerials.forEach(s => {
-    if(!byUnit[s.unit]) byUnit[s.unit] = [];
-    byUnit[s.unit].push(s);
-  });
-  el.innerHTML = Object.entries(byUnit).map(([unit, ss]) => {
-    const uLabel = UNITS.find(u=>u.key===unit)?.label || unit;
-    return `<div style="margin-bottom:10px">
-      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">${uLabel}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${ss.map(s=>`<span style="background:var(--s3);padding:4px 10px;border-radius:20px;font-family:monospace;font-size:0.9rem;display:flex;align-items:center;gap:6px">
-          ${s.serial_num}
-          ${canEdit?`<button onclick="deleteSerial(${s.id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.85rem;padding:0">×</button>`:''}
-        </span>`).join('')}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function addSerial() {
-  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
-  const itemId = parseInt(document.getElementById('serialModal').dataset.itemId);
-  const num = parseInt(document.getElementById('serialInput').value);
-  const unit = document.getElementById('serialUnitSelect').value;
-  if(!num){toast('הכנס מספר צ"','err');return;}
-  // Check duplicate
-  if(serials.find(s=>s.serial_num===num)) {
-    toast('מספר צ" זה כבר קיים במערכת','err'); return;
-  }
-  const {data,error} = await sb.from('serial_numbers').insert({item_id:itemId,serial_num:num,unit}).select().single();
-  if(error){toast('שגיאה: '+error.message,'err');return;}
-  serials.push(data);
-  document.getElementById('serialInput').value = '';
-  renderSerialsList(itemId);
-  toast('מספר צ" נוסף ✓');
-}
-
-async function deleteSerial(id) {
-  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
-  if(!confirm('למחוק מספר צ" זה?')) return;
-  const {error} = await sb.from('serial_numbers').delete().eq('id',id);
-  if(error){toast('שגיאה','err');return;}
-  serials = serials.filter(s=>s.id!==id);
-  const itemId = parseInt(document.getElementById('serialModal').dataset.itemId);
-  renderSerialsList(itemId);
-  toast('נמחק ✓');
-}
-
-function renderSerials() {
-  const unitFilter = document.getElementById('serialUnitFilter')?.value || 'all';
-  // Populate unit filter
-  const sel = document.getElementById('serialUnitFilter');
-  if(sel) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="all">כל הפלוגות</option>' +
-      UNITS.map(u=>`<option value="${u.key}" ${u.key===cur?'selected':''}>${u.label}</option>`).join('');
-  }
-
-  const el = document.getElementById('serialsContent');
-  if(!el) return;
-
-  const unitsToShow = unitFilter==='all' ? UNITS : UNITS.filter(u=>u.key===unitFilter);
-  const today = new Date().toISOString().slice(0,10);
-
-  let html = '';
-  unitsToShow.forEach(unit => {
-    const unitSerials = serials.filter(s=>s.unit===unit.key);
-    if(!unitSerials.length) return;
-
-    const todayConf = confirmations.find(c=>c.unit===unit.key && c.date===today);
-    const lastConfs = confirmations.filter(c=>c.unit===unit.key).slice(0,5);
-
-    html += `<div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <h3 style="margin:0;color:${unit.color}">${unit.label} — ${unitSerials.length} מספרי צ"</h3>
-        ${todayConf
-          ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:5px 12px;border-radius:20px;font-size:0.82rem">✅ אושר היום ע"י ${esc(todayConf.confirmed_by)}</span>`
-          : `<button class="btn primary" style="font-size:0.82rem" onclick="openConfirmDialog('${unit.key}','${unit.label}')">✅ אישור יומי</button>`
-        }
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">
-        ${unitSerials.map(s => {
-          const it = items.find(i=>i.id===s.item_id);
-          return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;font-size:0.85rem">
-            <span style="font-family:monospace;font-weight:600">${s.serial_num}</span>
-            <span style="color:var(--muted);font-size:0.75rem;margin-right:6px">${it?esc(it.name):''}</span>
-          </div>`;
-        }).join('')}
-      </div>
-      ${lastConfs.length ? `
-        <div style="border-top:1px solid var(--border);padding-top:10px">
-          <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px">היסטוריית אישורים:</div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            ${lastConfs.map(c=>`<div style="font-size:0.78rem;color:var(--muted)">
-              📅 ${c.date} — ${esc(c.confirmed_by)} ${c.note?'| '+esc(c.note):''}
-            </div>`).join('')}
-          </div>
-        </div>` : ''}
-    </div>`;
-  });
-
-  if(!html) html = '<div style="text-align:center;color:var(--muted);padding:40px">אין מספרי צ" רשומים עדיין</div>';
-  el.innerHTML = html;
-}
-
-function openConfirmDialog(unitKey, unitLabel) {
-  const name = prompt(`אישור יומי — ${unitLabel}\nשם המאשר:`);
-  if(!name || !name.trim()) return;
-  const note = prompt('הערה (אופציונלי):') || '';
-  confirmSerials(unitKey, name.trim(), note.trim());
-}
-
-async function confirmSerials(unitKey, confirmedBy, note) {
-  const today = new Date().toISOString().slice(0,10);
-  const {data,error} = await sb.from('serial_confirmations')
-    .insert({unit:unitKey, date:today, confirmed_by:confirmedBy, note})
-    .select().single();
-  if(error){toast('שגיאה: '+error.message,'err');return;}
-  confirmations.unshift(data);
-  toast(`אישור נשמר ✓ — ${confirmedBy}`);
-  renderSerials();
 }
 
 async function updateMakat(id, val) {
@@ -1597,13 +1440,115 @@ function setMovFilter(f, el) {
   renderMovements();
 }
 
+
+// ═══════════════════════════════════════
+// SERIAL NUMBERS (מספרי צ")
+// ═══════════════════════════════════════
+let serials = [];
+let confirmations = [];
+
+async function loadSerials() {
+  const [sRes, cRes] = await Promise.all([
+    sb.from('serial_numbers').select('*').order('serial_num'),
+    sb.from('serial_confirmations').select('*').order('date',{ascending:false}).limit(200)
+  ]);
+  if(!sRes.error) serials = sRes.data||[];
+  if(!cRes.error) confirmations = cRes.data||[];
+}
+
+function renderSerials() {
+  const sel = document.getElementById('serialUnitFilter');
+  if(sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="all">כל הפלוגות</option>' +
+      UNITS.map(u=>`<option value="${u.key}" ${u.key===cur?'selected':''}>${u.label}</option>`).join('');
+  }
+  const unitFilter = sel?.value||'all';
+  const el = document.getElementById('serialsContent');
+  if(!el) return;
+
+  const unitsToShow = unitFilter==='all' ? UNITS : UNITS.filter(u=>u.key===unitFilter);
+  const today = new Date().toISOString().slice(0,10);
+  let html = '';
+
+  unitsToShow.forEach(unit => {
+    const unitSerials = serials.filter(s=>s.unit===unit.key);
+    if(!unitSerials.length) return;
+    const todayConf = confirmations.find(c=>c.unit===unit.key && c.date===today);
+    const lastConfs = confirmations.filter(c=>c.unit===unit.key).slice(0,5);
+
+    html += `<div style="background:var(--s1);border:2px solid ${unit.color}33;border-radius:12px;padding:18px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0;color:${unit.color}">${unit.label} — ${unitSerials.length} נשקים</h3>
+        ${todayConf
+          ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:5px 14px;border-radius:20px;font-size:0.82rem">✅ אושר ${todayConf.date} ע"י ${esc(todayConf.confirmed_by)}</span>`
+          : `<button class="btn primary" style="font-size:0.82rem" onclick="openConfirmDialog('${unit.key}','${unit.label}')">✅ אישור יומי</button>`
+        }
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${lastConfs.length?14:0}px">
+        ${unitSerials.map(s=>{
+          const it = items.find(i=>i.id===s.item_id);
+          return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:7px 14px">
+            <div style="font-family:monospace;font-weight:700;font-size:1rem">${s.serial_num}</div>
+            <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${it?esc(it.name):''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${lastConfs.length?`
+        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
+          <div style="font-size:0.73rem;color:var(--muted);margin-bottom:5px">היסטוריית אישורים:</div>
+          ${lastConfs.map(conf=>`<div style="font-size:0.78rem;color:var(--muted);padding:2px 0">
+            📅 ${conf.date} — ${esc(conf.confirmed_by)}${conf.note?' · '+esc(conf.note):''}
+          </div>`).join('')}
+        </div>` : ''}
+    </div>`;
+  });
+
+  if(!html) html='<div style="text-align:center;color:var(--muted);padding:40px;font-size:0.95rem">אין מספרי צ" רשומים עדיין.<br>מספרי צ" נרשמים אוטומטית בזמן רישום יציאה של נשק אישי.</div>';
+  el.innerHTML = html;
+}
+
+function openConfirmDialog(unitKey, unitLabel) {
+  const name = prompt('אישור יומי — ' + unitLabel + '\nשם המאשר:');
+  if(!name||!name.trim()) return;
+  const note = prompt('הערה (אופציונלי — השאר ריק לאין הערה):') || '';
+  confirmSerials(unitKey, name.trim(), note.trim());
+}
+
+async function confirmSerials(unitKey, confirmedBy, note) {
+  const today = new Date().toISOString().slice(0,10);
+  const {data,error} = await sb.from('serial_confirmations')
+    .insert({unit:unitKey, date:today, confirmed_by:confirmedBy, note})
+    .select().single();
+  if(error){toast('שגיאה: '+error.message,'err');return;}
+  confirmations.unshift(data);
+  toast('אישור נשמר ✓ — ' + confirmedBy);
+  renderSerials();
+}
+
+const SERIAL_CATS = ['נשק אישי'];
+
+function isSerialItem(itemId) {
+  const it = items.find(i=>i.id===itemId);
+  return it && SERIAL_CATS.includes(it.cat);
+}
+
 function openMovModal(action) {
   document.getElementById('movAction').value = action;
   document.getElementById('movModalTitle').textContent = action==='out' ? '📤 רישום יציאה' : '📥 רישום החזרה';
   document.getElementById('movSubmitBtn').textContent = action==='out' ? 'רשום יציאה' : 'רשום החזרה';
+  document.getElementById('movSerial').value = '';
 
   const sel = document.getElementById('movItem');
   sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name} (${it.cat})</option>`).join('');
+
+  // Show serial field for all 'out' movements, hide for 'in'
+  const toggleSerial = () => {
+    document.getElementById('serialRow').style.display = action==='out' ? '' : 'none';
+  };
+  sel.onchange = null;
+  toggleSerial();
+
   openModal('movModal');
 }
 
@@ -1615,15 +1560,43 @@ async function submitMovement() {
   const qty = parseInt(document.getElementById('movQty').value)||0;
   const person = document.getElementById('movPerson').value.trim();
   const note = document.getElementById('movNote').value.trim();
+  const serialNum = document.getElementById('movSerial').value.trim();
 
   if(!qty || qty<=0){toast('כמות חייבת להיות גדולה מ-0','err');return;}
 
+  // Serial is optional - no validation needed
+
   const {data,error} = await sb.from('movements').insert({
-    item_id:itemId, unit, action, quantity:qty, person_name:person, note
+    item_id:itemId, unit, action, quantity:qty, person_name:person, note,
+    serial_num: serialNum ? parseInt(serialNum) : null
   }).select().single();
 
   if(error){toast('שגיאה ברישום','err');return;}
   movements.unshift(data);
+
+  // If serial number provided - register/remove it
+  if(serialNum) {
+    if(action==='out') {
+      // Add serial to unit
+      const dup = serials.find(s=>s.serial_num===parseInt(serialNum));
+      if(dup) {
+        toast('⚠️ מספר צ" זה כבר רשום תחת פלוגה אחרת!','err');
+      } else {
+        const {data:sd} = await sb.from('serial_numbers').insert({
+          item_id:itemId, serial_num:parseInt(serialNum), unit
+        }).select().single();
+        if(sd) serials.push(sd);
+      }
+    } else {
+      // Remove serial on return
+      const existing = serials.find(s=>s.serial_num===parseInt(serialNum));
+      if(existing) {
+        await sb.from('serial_numbers').delete().eq('id',existing.id);
+        serials = serials.filter(s=>s.id!==existing.id);
+      }
+    }
+  }
+
   closeModal('movModal');
   renderAll();
   toast((action==='out'?'יציאה':'החזרה') + ' נרשמה ✓');
@@ -1704,22 +1677,6 @@ function printReport() {
 </div>
 
 <!-- EDIT ITEM MODAL -->
-<div class="modal-bg" id="serialModal">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-title">🔢 ניהול מספרי צ"</div>
-    <div id="serialModalItemName" style="font-size:0.9rem;color:var(--muted);margin-bottom:14px"></div>
-    <div id="serialsList" style="margin-bottom:16px;max-height:200px;overflow-y:auto"></div>
-    <div style="display:flex;gap:8px" id="serialAddRow">
-      <input type="number" id="serialInput" placeholder='מספר צ"...' style="flex:1;padding:8px;border-radius:8px;background:var(--s2);color:var(--text);border:1px solid var(--border2);font-family:monospace;font-size:1rem" onkeydown="if(event.key==='Enter')addSerial()">
-      <select id="serialUnitSelect" style="padding:8px;border-radius:8px;background:var(--s2);color:var(--text);border:1px solid var(--border2);font-family:'Heebo',sans-serif"></select>
-      <button class="btn primary" onclick="addSerial()">הוסף</button>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeModal('serialModal')">סגור</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-bg" id="editItemModal">
   <div class="modal" style="max-width:420px">
     <div class="modal-title">✏️ עריכת פריט</div>
