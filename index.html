@@ -1504,7 +1504,7 @@ function renderSerials() {
     </div>`;
   });
 
-  if(!html) html='<div style="text-align:center;color:var(--muted);padding:40px;font-size:0.95rem">אין מספרי צ" רשומים עדיין.<br>מספרי צ" נרשמים אוטומטית בזמן רישום יציאה של נשק אישי.</div>';
+  if(!html) html='<div style="text-align:center;color:var(--muted);padding:40px;font-size:0.95rem">אין מספרי צ" רשומים עדיין.<br>מספרי צ" נרשמים בזמן רישום יציאה.</div>';
   el.innerHTML = html;
 }
 
@@ -1598,7 +1598,10 @@ async function submitMovement() {
   }
 
   closeModal('movModal');
+  await loadSerials();
   renderAll();
+  // Re-render serials page if open
+  if(document.getElementById('page-serials').style.display !== 'none') renderSerials();
   toast((action==='out'?'יציאה':'החזרה') + ' נרשמה ✓');
 }
 
