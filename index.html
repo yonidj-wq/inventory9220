@@ -493,7 +493,6 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
       <h2>🔄 תנועות ציוד</h2>
       <div class="topbar-actions">
         <button class="btn danger" onclick="openMovModal('out')">📤 יציאה</button>
-        <button class="btn success" onclick="openMovModal('in')">📥 החזרה</button>
       </div>
     </div>
     <div class="content">
@@ -1500,9 +1499,12 @@ function renderSerials() {
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${lastConfs.length?14:0}px">
         ${unitSerials.map(s=>{
           const it = items.find(i=>i.id===s.item_id);
-          return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:7px 14px">
-            <div style="font-family:monospace;font-weight:700;font-size:1rem">${s.serial_num}</div>
-            <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${it?esc(it.name):''}</div>
+          return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px">
+            <div style="flex:1">
+              <div style="font-family:monospace;font-weight:700;font-size:1rem">${s.serial_num}</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${it?esc(it.name):''}</div>
+            </div>
+            ${canEdit?`<button onclick="openReturnModal(${s.id},${s.serial_num},${s.item_id},'${s.unit}')" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid #22c55e44;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;font-family:'Heebo',sans-serif">📥 החזר</button>`:''}
           </div>`;
         }).join('')}
       </div>
@@ -1518,6 +1520,49 @@ function renderSerials() {
 
   if(!html) html='<div style="text-align:center;color:var(--muted);padding:40px;font-size:0.95rem">אין מספרי צ" רשומים עדיין.<br>מספרי צ" נרשמים בזמן רישום יציאה.</div>';
   el.innerHTML = html;
+}
+
+function openReturnModal(serialId, serialNum, itemId, unit) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const it = items.find(i=>i.id===itemId);
+  const unitLabel = UNITS.find(u=>u.key===unit)?.label||unit;
+  document.getElementById('returnSerialId').value = serialId;
+  document.getElementById('returnSerialNum').value = serialNum;
+  document.getElementById('returnItemId').value = itemId;
+  document.getElementById('returnUnit').value = unit;
+  document.getElementById('returnPerson').value = '';
+  document.getElementById('returnNote').value = '';
+  document.getElementById('returnModalInfo').innerHTML =
+    `<strong>צ" ${serialNum}</strong> — ${it?esc(it.name):'פריט'}<br><span style="color:var(--muted)">פלוגה ${unitLabel}</span>`;
+  openModal('returnModal');
+}
+
+async function submitReturn() {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const serialId  = parseInt(document.getElementById('returnSerialId').value);
+  const serialNum = parseInt(document.getElementById('returnSerialNum').value);
+  const itemId    = parseInt(document.getElementById('returnItemId').value);
+  const unit      = document.getElementById('returnUnit').value;
+  const person    = document.getElementById('returnPerson').value.trim();
+  const note      = document.getElementById('returnNote').value.trim();
+
+  // Register movement 'in'
+  const {error:me} = await sb.from('movements').insert({
+    item_id:itemId, unit, action:'in', quantity:1,
+    person_name:person, note, serial_num:serialNum
+  });
+  if(me){toast('שגיאה: '+me.message,'err');return;}
+
+  // Delete from serial_numbers
+  const {error:de} = await sb.from('serial_numbers').delete().eq('id',serialId);
+  if(de){toast('שגיאה: '+de.message,'err');return;}
+
+  serials = serials.filter(s=>s.id!==serialId);
+  closeModal('returnModal');
+  await loadSerials();
+  renderAll();
+  if(document.getElementById('page-serials').style.display!=='none') renderSerials();
+  toast('החזרה נרשמה ✓ — צ" ' + serialNum);
 }
 
 function openConfirmDialog(unitKey) {
@@ -1591,20 +1636,17 @@ async function submitMovement() {
   if(serialNum) {
     const sNum = parseInt(serialNum);
     if(action==='out') {
-      // Upsert - insert or update if exists
+      // Insert or update serial number
       const {data:sd, error:se} = await sb.from('serial_numbers')
         .upsert({item_id:itemId, serial_num:sNum, unit}, {onConflict:'serial_num'})
         .select().single();
-      if(se) console.error('serial upsert error:', se.message);
+      if(se) { console.error('serial error:', se.message); toast('שגיאה בשמירת צ": '+se.message,'err'); }
       else {
         serials = serials.filter(s=>s.serial_num!==sNum);
-        serials.push(sd);
+        if(sd) serials.push(sd);
       }
-    } else {
-      // Remove serial on return
-      const {error:de} = await sb.from('serial_numbers').delete().eq('serial_num', sNum);
-      if(!de) serials = serials.filter(s=>s.serial_num!==sNum);
     }
+    // Returns are handled via the serial report page
   }
 
   closeModal('movModal');
@@ -1690,6 +1732,29 @@ function printReport() {
 </div>
 
 <!-- EDIT ITEM MODAL -->
+<div class="modal-bg" id="returnModal">
+  <div class="modal" style="max-width:400px">
+    <h3>📥 החזרת נשק</h3>
+    <div id="returnModalInfo" style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.9rem"></div>
+    <div class="form-group">
+      <label>שם המחזיר</label>
+      <input type="text" id="returnPerson" placeholder="שם ודרגה">
+    </div>
+    <div class="form-group">
+      <label>הערה</label>
+      <input type="text" id="returnNote" placeholder="הערה אופציונלי">
+    </div>
+    <input type="hidden" id="returnSerialId">
+    <input type="hidden" id="returnSerialNum">
+    <input type="hidden" id="returnItemId">
+    <input type="hidden" id="returnUnit">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('returnModal')">ביטול</button>
+      <button class="btn primary" onclick="submitReturn()">📥 אשר החזרה</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="editItemModal">
   <div class="modal" style="max-width:420px">
     <div class="modal-title">✏️ עריכת פריט</div>
