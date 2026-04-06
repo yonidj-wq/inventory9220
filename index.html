@@ -1589,24 +1589,21 @@ async function submitMovement() {
 
   // If serial number provided - register/remove it
   if(serialNum) {
+    const sNum = parseInt(serialNum);
     if(action==='out') {
-      // Add serial to unit
-      const dup = serials.find(s=>s.serial_num===parseInt(serialNum));
-      if(dup) {
-        toast('⚠️ מספר צ" זה כבר רשום תחת פלוגה אחרת!','err');
-      } else {
-        const {data:sd} = await sb.from('serial_numbers').insert({
-          item_id:itemId, serial_num:parseInt(serialNum), unit
-        }).select().single();
-        if(sd) serials.push(sd);
+      // Upsert - insert or update if exists
+      const {data:sd, error:se} = await sb.from('serial_numbers')
+        .upsert({item_id:itemId, serial_num:sNum, unit}, {onConflict:'serial_num'})
+        .select().single();
+      if(se) console.error('serial upsert error:', se.message);
+      else {
+        serials = serials.filter(s=>s.serial_num!==sNum);
+        serials.push(sd);
       }
     } else {
       // Remove serial on return
-      const existing = serials.find(s=>s.serial_num===parseInt(serialNum));
-      if(existing) {
-        await sb.from('serial_numbers').delete().eq('id',existing.id);
-        serials = serials.filter(s=>s.id!==existing.id);
-      }
+      const {error:de} = await sb.from('serial_numbers').delete().eq('serial_num', sNum);
+      if(!de) serials = serials.filter(s=>s.serial_num!==sNum);
     }
   }
 
