@@ -93,9 +93,9 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat-chip .s-sub{font-size:0.72rem;color:var(--muted);margin-top:2px}
 
 /* ── TABLE ── */
-.tbl-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+.tbl-wrap{overflow-x:auto;overflow-y:auto;max-height:calc(100vh - 180px);border-radius:10px;border:1px solid var(--border)}
 table{width:100%;border-collapse:collapse;min-width:700px}
-thead th{background:var(--s2);padding:10px 12px;font-size:0.75rem;font-weight:600;color:var(--muted);text-align:right;border-bottom:2px solid var(--border2);white-space:nowrap}
+thead th{background:var(--s2);padding:10px 12px;font-size:0.75rem;font-weight:600;color:var(--muted);text-align:right;border-bottom:2px solid var(--border2);white-space:nowrap;position:sticky;top:0;z-index:10}
 th.center,td.center{text-align:center}
 tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
 tbody tr:last-child{border-bottom:none}
@@ -393,8 +393,8 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     <button class="nav-item" onclick="showPage('report',this)">
       <span class="icon">📋</span><span>דיווח</span>
     </button>
-    <button class="nav-item" onclick="showPage('serials',this)">
-      <span class="icon">🔢</span><span>דוח צ"</span>
+    <button class="nav-item" id="navCategories" onclick="showPage('categories',this)" style="display:none">
+      <span class="icon">🏷️</span><span>קטגוריות</span>
     </button>
   </nav>
   <div class="sync-status">
@@ -441,6 +441,7 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
       <h2>📦 מלאי נוכחי</h2>
       <div class="topbar-actions">
         <div class="search-wrap"><input type="text" id="invSearch" placeholder="חיפוש..." oninput="renderInventory()"></div>
+        <button class="btn" onclick="exportToExcel()">📊 ייצוא Excel</button>
         <button class="btn primary" onclick="openModal('addItemModal')">➕ פריט חדש</button>
       </div>
     </div>
@@ -493,6 +494,7 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
       <h2>🔄 תנועות ציוד</h2>
       <div class="topbar-actions">
         <button class="btn danger" onclick="openMovModal('out')">📤 יציאה</button>
+        <button class="btn success" onclick="openMovModal('in')">📥 החזרה</button>
       </div>
     </div>
     <div class="content">
@@ -520,16 +522,16 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     <div class="content" id="reportContent"></div>
   </div>
 
-  <div id="page-serials" style="display:none">
+  <div id="page-categories" style="display:none">
     <div class="topbar">
-      <h2>🔢 דוח צ"</h2>
+      <h2>🏷️ ניהול קטגוריות</h2>
       <div class="topbar-actions">
-        <select id="serialUnitFilter" onchange="renderSerials()" style="padding:6px 10px;border-radius:8px;background:var(--s2);color:var(--text);border:1px solid var(--border2);font-family:'Heebo',sans-serif">
-          <option value="all">כל הפלוגות</option>
-        </select>
+        <button class="btn primary" onclick="openAddCatModal()">➕ קטגוריה חדשה</button>
       </div>
     </div>
-    <div class="content" id="serialsContent"></div>
+    <div class="content">
+      <div id="catList" style="max-width:520px;margin:0 auto"></div>
+    </div>
   </div>
 
 </div><!-- /main -->
@@ -599,10 +601,6 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
       <label>שם האחראי</label>
       <input type="text" id="movPerson" placeholder="שם ודרגה">
     </div>
-    <div class="form-group" id="serialRow" style="display:none">
-      <label>מספר צ" <span style="font-size:0.78rem;color:var(--muted)">(אופציונלי)</span></label>
-      <input type="number" id="movSerial" placeholder='מספר צ" של הפריט'>
-    </div>
     <div class="form-group">
       <label>הערה</label>
       <input type="text" id="movNote" placeholder="הערה אופציונלי">
@@ -615,15 +613,6 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
 </div>
 
 <script>
-
-function esc(str) {
-  return String(str||'')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#39;');
-}
 
 // ═══════════════════════════════════════
 // AUTH
@@ -638,6 +627,8 @@ function tryAuth() {
     document.getElementById('authOverlay').style.display = 'none';
     setTimeout(loadAll, 100);
     toast('ברוך הבא — מצב עריכה ✓');
+    const nc = document.getElementById('navCategories');
+    if(nc) nc.style.display = '';
   } else {
     document.getElementById('authErr').textContent = 'סיסמה שגויה';
     document.getElementById('authInput').value = '';
@@ -717,7 +708,6 @@ async function loadAll() {
     if (items.length === 0) await seedData();
 
     setSyncState('ok','מחובר');
-    await loadSerials();
     renderAll();
     showPage('dashboard');
   } catch(e) {
@@ -973,7 +963,7 @@ function renderPage(name) {
   else if(name==='distribution') renderDistribution();
   else if(name==='movements') renderMovements();
   else if(name==='report') renderReport();
-  else if(name==='serials') renderSerials();
+  else if(name==='categories') renderCategories();
 }
 
 
@@ -1145,6 +1135,91 @@ async function autoDistributeFromDash() {
 // ═══════════════════════════════════════
 // PAGE: INVENTORY
 // ═══════════════════════════════════════
+
+
+// ═══════════════════════════════════════
+// CATEGORY MANAGEMENT
+// ═══════════════════════════════════════
+function renderCategories() {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const cats = [...new Set(items.map(i=>i.cat).filter(Boolean))].sort();
+  const el = document.getElementById('catList');
+  if(!el) return;
+  el.innerHTML = cats.map(cat => {
+    const count = items.filter(i=>i.cat===cat).length;
+    const safeCat = cat.replace(/'/g,"&#39;");
+    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--s1);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">
+      <span style="flex:1;font-weight:500">${cat}</span>
+      <span style="font-size:0.78rem;color:var(--muted);min-width:60px;text-align:center">${count} פריטים</span>
+      <button class="btn primary" style="padding:4px 12px;font-size:0.8rem" onclick="openRenamecat('${safeCat}')">✏️ שנה שם</button>
+    </div>`;
+  }).join('');
+}
+
+function openRenamecat(cat) {
+  const newName = prompt('שם חדש לקטגוריה "' + cat + '":', cat);
+  if(!newName || newName.trim()==='' || newName.trim()===cat) return;
+  renameCategory(cat, newName.trim());
+}
+
+async function renameCategory(oldCat, newCat) {
+  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
+  const affected = items.filter(i=>i.cat===oldCat);
+  if(!affected.length){toast('לא נמצאו פריטים','err');return;}
+  const {error} = await sb.from('items').update({cat:newCat}).in('id',affected.map(i=>i.id));
+  if(error){toast('שגיאה: '+error.message,'err');return;}
+  affected.forEach(i=>i.cat=newCat);
+  toast('קטגוריה עודכנה ✓ ('+affected.length+' פריטים)');
+  renderCategories();
+}
+
+function openAddCatModal() {
+  document.getElementById('newCatName').value = '';
+  openModal('addCatModal');
+}
+
+function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  if(!name){toast('חובה למלא שם','err');return;}
+  if(items.some(i=>i.cat===name)){toast('קטגוריה זו כבר קיימת','err');return;}
+  closeModal('addCatModal');
+  toast('קטגוריה "'+name+'" נוצרה — הוסף פריטים אליה דרך מלאי ✓');
+  // Category will appear in dropdown when adding items
+}
+
+// ═══════════════════════════════════════
+// EXCEL EXPORT
+// ═══════════════════════════════════════
+function exportToExcel() {
+  const rows = [['קטגוריה','מק"ט','שם פריט','כמות כוללת','בשטח','בנשקייה','הערות']];
+  const cats = [...new Set(items.map(it=>it.cat))];
+  cats.forEach(cat => {
+    const catItems = items.filter(it=>it.cat===cat);
+    catItems.forEach(it => {
+      const inF = getInField(it.id);
+      rows.push([cat, it.makat||'', it.name, it.total, inF, Math.max(0,it.total-inF), it.note||'']);
+    });
+    // Category total row
+    const total = catItems.reduce((a,it)=>a+it.total,0);
+    const inFTotal = catItems.reduce((a,it)=>a+getInField(it.id),0);
+    rows.push(['סה"כ — '+cat,'','',total,inFTotal,Math.max(0,total-inFTotal),'']);
+    rows.push([]); // empty row between categories
+  });
+
+  // Build CSV with BOM for Hebrew support
+  const bom = '\uFEFF';
+  const csv = bom + rows.map(r=>r.map(v=>'"'+(String(v||'').replace(/"/g,'""'))+'"').join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const date = new Date().toLocaleDateString('he-IL').replace(/\//g,'-');
+  a.download = 'מלאי_'+date+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('קובץ Excel הורד ✓');
+}
+
 function renderInventory() {
   const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
 
@@ -1335,7 +1410,13 @@ function renderDistribution() {
   cats.forEach(cat => {
     const catItems = items.filter(it=>it.cat===cat);
     if(!catItems.length) return;
-    html += `<tr class="cat-row"><td colspan="${3+units.length+2}">${cat}</td></tr>`;
+    // Category totals
+    const catTotals = {};
+    units.forEach(u => { catTotals[u.key] = catItems.reduce((a,it)=>a+getDist(it.id,u.key),0); });
+    const catTotal = catItems.reduce((a,it)=>a+it.total,0);
+    const catAssigned = catItems.reduce((a,it)=>a+UNITS.reduce((b,u)=>b+getDist(it.id,u.key),0),0);
+    let catCells = units.map(u=>`<td class="center" style="font-weight:700;color:${u.color}">${catTotals[u.key]}</td>`).join('');
+    html += `<tr class="cat-row"><td colspan="1" style="font-weight:700">${cat}</td><td class="center" style="font-weight:700">${catTotal}</td>${catCells}<td class="center" style="font-weight:700">${catAssigned}</td><td></td><td></td></tr>`;
     catItems.forEach(it => {
       const assigned = UNITS.reduce((a,u)=>a+getDist(it.id,u.key),0);
       const gap = it.total - assigned;
@@ -1448,165 +1529,13 @@ function setMovFilter(f, el) {
   renderMovements();
 }
 
-
-// ═══════════════════════════════════════
-// SERIAL NUMBERS (מספרי צ")
-// ═══════════════════════════════════════
-let serials = [];
-let confirmations = [];
-
-async function loadSerials() {
-  const [sRes, cRes] = await Promise.all([
-    sb.from('serial_numbers').select('*').order('serial_num'),
-    sb.from('serial_confirmations').select('*').order('date',{ascending:false}).limit(200)
-  ]);
-  if(sRes.error) console.error('serial_numbers error:', sRes.error.message);
-  else serials = sRes.data||[];
-  if(cRes.error) console.error('serial_confirmations error:', cRes.error.message);
-  else confirmations = cRes.data||[];
-  console.log('serials loaded:', serials.length, serials);
-}
-
-function renderSerials() {
-  const sel = document.getElementById('serialUnitFilter');
-  if(sel) {
-    const cur = sel.value;
-    sel.innerHTML = '<option value="all">כל הפלוגות</option>' +
-      UNITS.map(u=>`<option value="${u.key}" ${u.key===cur?'selected':''}>${u.label}</option>`).join('');
-  }
-  const unitFilter = sel?.value||'all';
-  const el = document.getElementById('serialsContent');
-  if(!el) return;
-
-  const unitsToShow = unitFilter==='all' ? UNITS : UNITS.filter(u=>u.key===unitFilter);
-  const today = new Date().toISOString().slice(0,10);
-  let html = '';
-
-  unitsToShow.forEach(unit => {
-    const unitSerials = serials.filter(s=>s.unit===unit.key);
-    if(!unitSerials.length) return;
-    const todayConf = confirmations.find(c=>c.unit===unit.key && c.date===today);
-    const lastConfs = confirmations.filter(c=>c.unit===unit.key).slice(0,5);
-
-    html += `<div style="background:var(--s1);border:2px solid ${unit.color}33;border-radius:12px;padding:18px;margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <h3 style="margin:0;color:${unit.color}">${unit.label} — ${unitSerials.length} נשקים</h3>
-        ${todayConf
-          ? `<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:5px 14px;border-radius:20px;font-size:0.82rem">✅ אושר ${todayConf.date} ע"י ${esc(todayConf.confirmed_by)}</span>`
-          : `<button class="btn primary" style="font-size:0.82rem" onclick="openConfirmDialog('${unit.key}')">✅ אישור יומי</button>`
-        }
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:${lastConfs.length?14:0}px">
-        ${unitSerials.map(s=>{
-          const it = items.find(i=>i.id===s.item_id);
-          return `<div style="background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px">
-            <div style="flex:1">
-              <div style="font-family:monospace;font-weight:700;font-size:1rem">${s.serial_num}</div>
-              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px">${it?esc(it.name):''}</div>
-            </div>
-            ${canEdit?`<button onclick="openReturnModal(${s.id},${s.serial_num},${s.item_id},'${s.unit}')" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid #22c55e44;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:0.78rem;font-family:'Heebo',sans-serif">📥 החזר</button>`:''}
-          </div>`;
-        }).join('')}
-      </div>
-      ${lastConfs.length?`
-        <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:4px">
-          <div style="font-size:0.73rem;color:var(--muted);margin-bottom:5px">היסטוריית אישורים:</div>
-          ${lastConfs.map(conf=>`<div style="font-size:0.78rem;color:var(--muted);padding:2px 0">
-            📅 ${conf.date} — ${esc(conf.confirmed_by)}${conf.note?' · '+esc(conf.note):''}
-          </div>`).join('')}
-        </div>` : ''}
-    </div>`;
-  });
-
-  if(!html) html='<div style="text-align:center;color:var(--muted);padding:40px;font-size:0.95rem">אין מספרי צ" רשומים עדיין.<br>מספרי צ" נרשמים בזמן רישום יציאה.</div>';
-  el.innerHTML = html;
-}
-
-function openReturnModal(serialId, serialNum, itemId, unit) {
-  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
-  const it = items.find(i=>i.id===itemId);
-  const unitLabel = UNITS.find(u=>u.key===unit)?.label||unit;
-  document.getElementById('returnSerialId').value = serialId;
-  document.getElementById('returnSerialNum').value = serialNum;
-  document.getElementById('returnItemId').value = itemId;
-  document.getElementById('returnUnit').value = unit;
-  document.getElementById('returnPerson').value = '';
-  document.getElementById('returnNote').value = '';
-  document.getElementById('returnModalInfo').innerHTML =
-    `<strong>צ" ${serialNum}</strong> — ${it?esc(it.name):'פריט'}<br><span style="color:var(--muted)">פלוגה ${unitLabel}</span>`;
-  openModal('returnModal');
-}
-
-async function submitReturn() {
-  if(!canEdit){toast('מצב צפייה בלבד','err');return;}
-  const serialId  = parseInt(document.getElementById('returnSerialId').value);
-  const serialNum = parseInt(document.getElementById('returnSerialNum').value);
-  const itemId    = parseInt(document.getElementById('returnItemId').value);
-  const unit      = document.getElementById('returnUnit').value;
-  const person    = document.getElementById('returnPerson').value.trim();
-  const note      = document.getElementById('returnNote').value.trim();
-
-  // Register movement 'in'
-  const {error:me} = await sb.from('movements').insert({
-    item_id:itemId, unit, action:'in', quantity:1,
-    person_name:person, note, serial_num:serialNum
-  });
-  if(me){toast('שגיאה: '+me.message,'err');return;}
-
-  // Delete from serial_numbers
-  const {error:de} = await sb.from('serial_numbers').delete().eq('id',serialId);
-  if(de){toast('שגיאה: '+de.message,'err');return;}
-
-  serials = serials.filter(s=>s.id!==serialId);
-  closeModal('returnModal');
-  await loadSerials();
-  renderAll();
-  if(document.getElementById('page-serials').style.display!=='none') renderSerials();
-  toast('החזרה נרשמה ✓ — צ" ' + serialNum);
-}
-
-function openConfirmDialog(unitKey) {
-  const unitLabel = UNITS.find(u=>u.key===unitKey)?.label || unitKey;
-  const name = prompt('אישור יומי — ' + unitLabel + '\nשם המאשר:');
-  if(!name||!name.trim()) return;
-  const note = prompt('הערה (אופציונלי — השאר ריק לאין הערה):') || '';
-  confirmSerials(unitKey, name.trim(), note.trim());
-}
-
-async function confirmSerials(unitKey, confirmedBy, note) {
-  const today = new Date().toISOString().slice(0,10);
-  const {data,error} = await sb.from('serial_confirmations')
-    .insert({unit:unitKey, date:today, confirmed_by:confirmedBy, note})
-    .select().single();
-  if(error){toast('שגיאה: '+error.message,'err');return;}
-  confirmations.unshift(data);
-  toast('אישור נשמר ✓ — ' + confirmedBy);
-  renderSerials();
-}
-
-const SERIAL_CATS = ['נשק אישי'];
-
-function isSerialItem(itemId) {
-  const it = items.find(i=>i.id===itemId);
-  return it && SERIAL_CATS.includes(it.cat);
-}
-
 function openMovModal(action) {
   document.getElementById('movAction').value = action;
   document.getElementById('movModalTitle').textContent = action==='out' ? '📤 רישום יציאה' : '📥 רישום החזרה';
   document.getElementById('movSubmitBtn').textContent = action==='out' ? 'רשום יציאה' : 'רשום החזרה';
-  document.getElementById('movSerial').value = '';
 
   const sel = document.getElementById('movItem');
   sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name} (${it.cat})</option>`).join('');
-
-  // Show serial field for all 'out' movements, hide for 'in'
-  const toggleSerial = () => {
-    document.getElementById('serialRow').style.display = action==='out' ? '' : 'none';
-  };
-  sel.onchange = null;
-  toggleSerial();
-
   openModal('movModal');
 }
 
@@ -1618,42 +1547,17 @@ async function submitMovement() {
   const qty = parseInt(document.getElementById('movQty').value)||0;
   const person = document.getElementById('movPerson').value.trim();
   const note = document.getElementById('movNote').value.trim();
-  const serialNum = document.getElementById('movSerial').value.trim();
 
   if(!qty || qty<=0){toast('כמות חייבת להיות גדולה מ-0','err');return;}
 
-  // Serial is optional - no validation needed
-
   const {data,error} = await sb.from('movements').insert({
-    item_id:itemId, unit, action, quantity:qty, person_name:person, note,
-    serial_num: serialNum ? parseInt(serialNum) : null
+    item_id:itemId, unit, action, quantity:qty, person_name:person, note
   }).select().single();
 
   if(error){toast('שגיאה ברישום','err');return;}
   movements.unshift(data);
-
-  // If serial number provided - register/remove it
-  if(serialNum) {
-    const sNum = parseInt(serialNum);
-    if(action==='out') {
-      // Insert or update serial number
-      const {data:sd, error:se} = await sb.from('serial_numbers')
-        .upsert({item_id:itemId, serial_num:sNum, unit}, {onConflict:'serial_num'})
-        .select().single();
-      if(se) { console.error('serial error:', se.message); toast('שגיאה בשמירת צ": '+se.message,'err'); }
-      else {
-        serials = serials.filter(s=>s.serial_num!==sNum);
-        if(sd) serials.push(sd);
-      }
-    }
-    // Returns are handled via the serial report page
-  }
-
   closeModal('movModal');
-  await loadSerials();
   renderAll();
-  // Re-render serials page if open
-  if(document.getElementById('page-serials').style.display !== 'none') renderSerials();
   toast((action==='out'?'יציאה':'החזרה') + ' נרשמה ✓');
 }
 
@@ -1732,25 +1636,16 @@ function printReport() {
 </div>
 
 <!-- EDIT ITEM MODAL -->
-<div class="modal-bg" id="returnModal">
-  <div class="modal" style="max-width:400px">
-    <h3>📥 החזרת נשק</h3>
-    <div id="returnModalInfo" style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:16px;font-size:0.9rem"></div>
+<div class="modal-bg" id="addCatModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-title">➕ קטגוריה חדשה</div>
     <div class="form-group">
-      <label>שם המחזיר</label>
-      <input type="text" id="returnPerson" placeholder="שם ודרגה">
+      <label>שם הקטגוריה</label>
+      <input type="text" id="newCatName" placeholder="שם הקטגוריה">
     </div>
-    <div class="form-group">
-      <label>הערה</label>
-      <input type="text" id="returnNote" placeholder="הערה אופציונלי">
-    </div>
-    <input type="hidden" id="returnSerialId">
-    <input type="hidden" id="returnSerialNum">
-    <input type="hidden" id="returnItemId">
-    <input type="hidden" id="returnUnit">
     <div class="modal-actions">
-      <button class="btn" onclick="closeModal('returnModal')">ביטול</button>
-      <button class="btn primary" onclick="submitReturn()">📥 אשר החזרה</button>
+      <button class="btn" onclick="closeModal('addCatModal')">ביטול</button>
+      <button class="btn primary" onclick="addCategory()">הוסף</button>
     </div>
   </div>
 </div>
