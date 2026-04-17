@@ -420,21 +420,6 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     </div>
   </div>
 
-
-  <!-- ── PAGE: DASHBOARD ── -->
-  <div id="page-dashboard" style="display:block">
-    <div class="topbar">
-      <h2>🏠 דשבורד</h2>
-      <div class="topbar-actions">
-        <div class="sync-status" style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted)">
-          <div class="sync-dot" id="syncDot2"></div>
-          <span id="syncText2">מחובר</span>
-        </div>
-      </div>
-    </div>
-    <div class="content" id="dashContent"></div>
-  </div>
-
   <!-- ── PAGE: INVENTORY ── -->
   <div id="page-inventory" style="display:none">
     <div class="topbar">
@@ -467,6 +452,7 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
     <div class="topbar">
       <h2>⚖️ חלוקה לפלוגות</h2>
       <div class="topbar-actions">
+        <button class="btn" onclick="exportDistributionToExcel()">📊 ייצוא Excel</button>
         <button class="btn" onclick="autoDistribute()">⚡ חלק שווה</button>
         <button class="btn primary" onclick="saveDistribution()">💾 שמור חלוקה</button>
       </div>
@@ -613,6 +599,18 @@ td.note-cell{font-size:0.75rem;color:var(--muted);max-width:180px}
 </div>
 
 <script>
+
+// ═══════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // ═══════════════════════════════════════
 // AUTH
@@ -1045,7 +1043,7 @@ function renderDashboard() {
       const dt = new Date(m.created_at).toLocaleDateString('he-IL',{day:'2-digit',month:'2-digit'});
       recentHtml += `<div class="recent-item">
         <div class="ri-icon">${isOut?'📤':'📥'}</div>
-        <div class="ri-text"><strong>${name}</strong> · פלוגה ${unitLabels[m.unit]||m.unit} · ${m.person_name||''} · ${dt}</div>
+        <div class="ri-text"><strong>${esc(name)}</strong> · פלוגה ${esc(unitLabels[m.unit]||m.unit)} · ${esc(m.person_name||'')} · ${dt}</div>
         <div class="ri-qty ${isOut?'out':'in'}">${isOut?'-':'+'}${m.quantity}</div>
       </div>`;
     });
@@ -1075,7 +1073,7 @@ function generateAlerts() {
     alerts.push({
       level:'warn', icon:'⚠️',
       title: `${undistributed.length} פריטים לא חולקו`,
-      body: undistributed.slice(0,3).map(it=>it.name).join(', ') + (undistributed.length>3?` ועוד ${undistributed.length-3}`:''),
+      body: undistributed.slice(0,3).map(it=>esc(it.name)).join(', ') + (undistributed.length>3?` ועוד ${undistributed.length-3}`:''),
       action: "showPage('distribution',null)", actionLabel: 'עבור לחלוקה'
     });
   }
@@ -1089,7 +1087,7 @@ function generateAlerts() {
     alerts.push({
       level:'danger', icon:'🔴',
       title: `${overDist.length} פריטים חולקו יותר מהמלאי`,
-      body: overDist.map(it=>it.name).join(', '),
+      body: overDist.map(it=>esc(it.name)).join(', '),
       action: "showPage('distribution',null)", actionLabel: 'תקן חלוקה'
     });
   }
@@ -1106,7 +1104,7 @@ function generateAlerts() {
     alerts.push({
       level:'warn', icon:'⚖️',
       title: `חלוקה לא שווה ב-${unequalItems.length} פריטים`,
-      body: 'פער של מעל 30% בין פלוגות הקרב: ' + unequalItems.slice(0,2).map(it=>it.name).join(', '),
+      body: 'פער של מעל 30% בין פלוגות הקרב: ' + unequalItems.slice(0,2).map(it=>esc(it.name)).join(', '),
       action: "autoDistributeFromDash()", actionLabel: '⚡ חלק שווה אוטומטית'
     });
   }
@@ -1118,7 +1116,7 @@ function generateAlerts() {
     alerts.push({
       level:'info', icon:'🏕️',
       title: `${total} פריטים בשטח`,
-      body: longOutItems.slice(0,3).map(it=>`${it.name} (${getInField(it.id)})`).join(', '),
+      body: longOutItems.slice(0,3).map(it=>`${esc(it.name)} (${getInField(it.id)})`).join(', '),
       action: "showPage('movements',null)", actionLabel: 'צפה בתנועות'
     });
   }
@@ -1147,11 +1145,10 @@ function renderCategories() {
   if(!el) return;
   el.innerHTML = cats.map(cat => {
     const count = items.filter(i=>i.cat===cat).length;
-    const safeCat = cat.replace(/'/g,"&#39;");
     return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--s1);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)">
-      <span style="flex:1;font-weight:500">${cat}</span>
+      <span style="flex:1;font-weight:500">${esc(cat)}</span>
       <span style="font-size:0.78rem;color:var(--muted);min-width:60px;text-align:center">${count} פריטים</span>
-      <button class="btn primary" style="padding:4px 12px;font-size:0.8rem" onclick="openRenamecat('${safeCat}')">✏️ שנה שם</button>
+      <button class="btn primary" style="padding:4px 12px;font-size:0.8rem" data-cat="${esc(cat)}" onclick="openRenamecat(this.dataset.cat)">✏️ שנה שם</button>
     </div>`;
   }).join('');
 }
@@ -1220,6 +1217,63 @@ function exportToExcel() {
   toast('קובץ Excel הורד ✓');
 }
 
+// ═══════════════════════════════════════
+// DISTRIBUTION EXCEL EXPORT
+// ═══════════════════════════════════════
+function exportDistributionToExcel() {
+  const activeUnits = distFilter === 'all' ? UNITS : UNITS.filter(u => u.key === distFilter);
+  const isAll = distFilter === 'all';
+
+  // Header
+  const header = ['קטגוריה', 'מק"ט', 'פריט', 'כמות כוללת'];
+  activeUnits.forEach(u => header.push(u.label));
+  if (isAll) header.push('סה"כ מחולק');
+  header.push('פער', 'הערות');
+
+  const rows = [header];
+  const cats = [...new Set(items.map(it => it.cat))];
+
+  cats.forEach(cat => {
+    const catItems = items.filter(it => it.cat === cat);
+
+    catItems.forEach(it => {
+      // gap is always vs all units, matching the Distribution page logic
+      const assigned = UNITS.reduce((a, u) => a + getDist(it.id, u.key), 0);
+      const gap = it.total - assigned;
+      const row = [cat, it.makat || '', it.name, it.total];
+      activeUnits.forEach(u => row.push(getDist(it.id, u.key)));
+      if (isAll) row.push(assigned);
+      row.push(gap, it.note || '');
+      rows.push(row);
+    });
+
+    // Category subtotal row
+    const catTotal = catItems.reduce((a, it) => a + it.total, 0);
+    const catAssigned = catItems.reduce((a, it) => a + UNITS.reduce((b, u) => b + getDist(it.id, u.key), 0), 0);
+    const catGap = catTotal - catAssigned;
+    const totRow = ['סה"כ — ' + cat, '', '', catTotal];
+    activeUnits.forEach(u => totRow.push(catItems.reduce((a, it) => a + getDist(it.id, u.key), 0)));
+    if (isAll) totRow.push(catAssigned);
+    totRow.push(catGap, '');
+    rows.push(totRow);
+    rows.push([]); // blank row between categories
+  });
+
+  // Build CSV with BOM for Hebrew support
+  const bom = '\uFEFF';
+  const csv = bom + rows.map(r => r.map(v => '"' + (String(v || '').replace(/"/g, '""')) + '"').join(',')).join('\n');
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const date = new Date().toLocaleDateString('he-IL').replace(/\//g, '-');
+  const unitLabel = isAll ? 'כללית' : (UNIT_LABELS[distFilter] || distFilter);
+  a.download = 'חלוקה_' + unitLabel + '_' + date + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('קובץ Excel הורד ✓');
+}
+
 function renderInventory() {
   const q = (document.getElementById('invSearch')?.value||'').toLowerCase();
 
@@ -1240,22 +1294,22 @@ function renderInventory() {
   cats.forEach(cat => {
     const catItems = items.filter(it => it.cat===cat && (!q || it.name.toLowerCase().includes(q) || it.cat.toLowerCase().includes(q)));
     if(!catItems.length) return;
-    html += `<tr class="cat-row"><td colspan="7">${cat}</td></tr>`;
+    html += `<tr class="cat-row"><td colspan="7">${esc(cat)}</td></tr>`;
     catItems.forEach(it => {
       const inF = getInField(it.id);
       const inStore = it.total - inF;
       html += `<tr>
           <td></td>
-          <td style="font-size:0.73rem;font-family:monospace;color:var(--muted);padding:9px 8px">${it.makat||'—'}</td>
-          <td class="item-name">${it.name}</td>
+          <td style="font-size:0.73rem;font-family:monospace;color:var(--muted);padding:9px 8px">${esc(it.makat)||'—'}</td>
+          <td class="item-name">${esc(it.name)}</td>
           <td class="center">${canEdit
             ? `<input class="qty-input" type="number" min="0" value="${it.total}" onchange="updateItemTotal(${it.id},this.value)" style="width:65px">`
             : it.total}</td>
           <td class="center" style="color:${inF>0?'var(--orange)':'var(--muted)'};font-weight:${inF>0?700:400}">${inF}</td>
           <td class="center" style="color:${inStore<0?'var(--red)':'var(--text)'}">${Math.max(0,inStore)}</td>
           <td class="note-cell">${canEdit
-            ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${it.note||''}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
-            : (it.note||'')}</td>
+            ? `<input class="qty-input" type="text" style="width:130px;font-size:0.78rem" value="${esc(it.note||'')}" placeholder="הערה" onblur="updateNote(${it.id},this.value)">`
+            : esc(it.note||'')}</td>
           <td style="white-space:nowrap">${canEdit ? `
             <button class="btn" style="padding:3px 8px;font-size:0.72rem;margin-left:3px" onclick="openEditItem(${it.id})">✏️</button>
             <button class="btn danger" style="padding:3px 8px;font-size:0.72rem" onclick="deleteItem(${it.id})">🗑</button>` : ''}</td>
@@ -1348,11 +1402,21 @@ async function updateItemTotal(id, val) {
 async function deleteItem(id) {
   if(!canEdit){toast('מצב צפייה בלבד', 'err');return;}
   if(!confirm('למחוק פריט זה?')) return;
-  const {error} = await sb.from('items').delete().eq('id',id);
-  if(error){toast('שגיאה במחיקה','err');return;}
-  items = items.filter(i=>i.id!==id);
-  distributions = distributions.filter(d=>d.item_id!==id);
-  movements = movements.filter(m=>m.item_id!==id);
+
+  // Delete child rows first to avoid FK constraint violations on the item delete
+  const {error: errDist} = await sb.from('distributions').delete().eq('item_id', id);
+  if(errDist){toast('שגיאה במחיקת חלוקות: ' + errDist.message, 'err');return;}
+
+  const {error: errMov} = await sb.from('movements').delete().eq('item_id', id);
+  if(errMov){toast('שגיאה במחיקת תנועות: ' + errMov.message, 'err');return;}
+
+  const {error: errItem} = await sb.from('items').delete().eq('id', id);
+  if(errItem){toast('שגיאה במחיקה: ' + errItem.message, 'err');return;}
+
+  // All DB deletes succeeded — now update local state
+  items = items.filter(i => i.id !== id);
+  distributions = distributions.filter(d => d.item_id !== id);
+  movements = movements.filter(m => m.item_id !== id);
   renderAll();
   toast('נמחק');
 }
@@ -1416,7 +1480,7 @@ function renderDistribution() {
     const catTotal = catItems.reduce((a,it)=>a+it.total,0);
     const catAssigned = catItems.reduce((a,it)=>a+UNITS.reduce((b,u)=>b+getDist(it.id,u.key),0),0);
     let catCells = units.map(u=>`<td class="center" style="font-weight:700;color:${u.color}">${catTotals[u.key]}</td>`).join('');
-    html += `<tr class="cat-row"><td colspan="1" style="font-weight:700">${cat}</td><td class="center" style="font-weight:700">${catTotal}</td>${catCells}<td class="center" style="font-weight:700">${catAssigned}</td><td></td><td></td></tr>`;
+    html += `<tr class="cat-row"><td colspan="1" style="font-weight:700">${esc(cat)}</td><td class="center" style="font-weight:700">${catTotal}</td>${catCells}<td class="center" style="font-weight:700">${catAssigned}</td><td></td><td></td></tr>`;
     catItems.forEach(it => {
       const assigned = UNITS.reduce((a,u)=>a+getDist(it.id,u.key),0);
       const gap = it.total - assigned;
@@ -1434,12 +1498,12 @@ function renderDistribution() {
       });
 
       html += `<tr>
-        <td class="item-name">${it.name}</td>
+        <td class="item-name">${esc(it.name)}</td>
         <td class="center">${it.total}</td>
         ${cells}
         <td class="center">${assigned}</td>
         <td class="center">${gapHtml}</td>
-        <td class="note-cell">${it.note||''}</td>
+        <td class="note-cell">${esc(it.note||'')}</td>
       </tr>`;
     });
   });
@@ -1513,8 +1577,8 @@ function renderMovements() {
     return `<div class="mov-card">
       <div class="mov-icon">${isOut?'📤':'📥'}</div>
       <div class="mov-info">
-        <div class="mov-title">${name}</div>
-        <div class="mov-meta">פלוגה ${UNIT_LABELS[m.unit]||m.unit} • ${m.person_name||'—'} • ${dt}${m.note?' • '+m.note:''}</div>
+        <div class="mov-title">${esc(name)}</div>
+        <div class="mov-meta">פלוגה ${esc(UNIT_LABELS[m.unit]||m.unit)} • ${esc(m.person_name||'—')} • ${dt}${m.note?' • '+esc(m.note):''}</div>
       </div>
       <div class="mov-qty ${isOut?'out':'in'}">${isOut?'-':'+'}${m.quantity}</div>
     </div>`;
@@ -1535,7 +1599,7 @@ function openMovModal(action) {
   document.getElementById('movSubmitBtn').textContent = action==='out' ? 'רשום יציאה' : 'רשום החזרה';
 
   const sel = document.getElementById('movItem');
-  sel.innerHTML = items.map(it=>`<option value="${it.id}">${it.name} (${it.cat})</option>`).join('');
+  sel.innerHTML = items.map(it=>`<option value="${it.id}">${esc(it.name)} (${esc(it.cat)})</option>`).join('');
   openModal('movModal');
 }
 
@@ -1583,12 +1647,12 @@ function renderReport() {
         </span>`;
       }).join('');
       return `<div class="report-item">
-        <div class="ri-name">${it.name}</div>
+        <div class="ri-name">${esc(it.name)}</div>
         <div style="font-size:0.8rem;color:var(--muted)">כולל: ${it.total}</div>
         <div class="ri-units">${tags||'<span style="font-size:0.7rem;color:var(--muted)">לא חולק</span>'}</div>
       </div>`;
     }).join('');
-    return `<div class="report-section"><h3>${cat}</h3><div class="report-grid">${rows}</div></div>`;
+    return `<div class="report-section"><h3>${esc(cat)}</h3><div class="report-grid">${rows}</div></div>`;
   }).join('');
 
   document.getElementById('reportContent').innerHTML = `
